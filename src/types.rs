@@ -1,7 +1,7 @@
-use crate::error::{Error, Result};
+use crate::error::{Error, ErrorKind, Result};
 use std::str::FromStr;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CrossRefType {
     /// Name of work's publisher
     pub id: String,
@@ -9,7 +9,7 @@ pub struct CrossRefType {
     pub label: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(tag = "id")]
 #[serde(rename_all = "kebab-case")]
 pub enum Types {
@@ -145,9 +145,9 @@ impl FromStr for Types {
             "book-series" => Ok(Types::BookSeries),
             "edited-book" => Ok(Types::EditedBook),
             "standard-series" => Ok(Types::StandardSeries),
-            name => Err(Error::InvalidTypeName {
+            name => Err(Error::from(ErrorKind::InvalidTypeName {
                 name: name.to_string(),
-            }),
+            })),
         }
     }
 }
