@@ -15,7 +15,7 @@ use crate::model::Work;
 ///    }
 ///  }```
 ///
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct CrossrefResponse {
     /// the status of the request
@@ -28,11 +28,39 @@ pub struct CrossrefResponse {
     //    pub message: Option<Work>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Message {
+    /// Singletons are single results. Retrieving metadata for a specific identifier
+    /// (e.g. DOI, ISSN, funder_identifier) typically returns in a singleton result.
+    Singleton {},
+    Multi {
+        total_results: i32,
+        items_per_page: i32,
+        items: Vec<Work>,
+    },
+    //    HeadersOnly
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(untagged)]
-pub enum MessageType {
+pub enum MessageFormat {
     Single(String),
     List(Vec<String>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(untagged)]
+// TODO [MessageFormat] sufficient?
+pub enum MessageType {
+    Funder,
+    Prefix,
+    Member,
+    Work,
+    WorkList,
+    FunderList,
+    PrefixList,
+    MemberList,
 }
 
 #[cfg(test)]

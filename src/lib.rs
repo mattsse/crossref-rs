@@ -6,6 +6,8 @@ extern crate failure;
 #[macro_use]
 extern crate serde_derive;
 
+use crate::model::ResourceLink;
+
 mod error;
 mod model;
 mod proto;
@@ -15,6 +17,9 @@ mod types;
 
 #[cfg(feature = "client")]
 mod client;
+
+use crate::error::Result;
+use serde::{Deserialize, Serialize};
 
 // https://github.com/sckott/habanero/blob/master/habanero/crossref/crossref.py
 
@@ -28,4 +33,24 @@ struct Crossref {
     pub api_key: Option<String>,
 }
 
-impl Crossref {}
+impl Crossref {
+    /// use HTTP HEAD requests to quickly determine "existence" of a singleton.
+    fn exists() {
+        unimplemented!()
+    }
+
+    /// execute the API call and deserialize the message into T
+    fn fetch_into<'de, T>() -> Result<T>
+    where
+        T: Deserialize<'de>,
+    {
+        unimplemented!()
+    }
+    /// execute the API call and deserialize the message into T
+    fn select<'de, T>() -> Result<T>
+    where
+        T: Serialize + Deserialize<'de>,
+    {
+        unimplemented!()
+    }
+}

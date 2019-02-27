@@ -1,7 +1,9 @@
 // see https://github.com/Crossref/rest-api-doc/blob/master/api_format.md
-use std::collections::HashMap;
 
-#[derive(Debug, Deserialize, Serialize)]
+/// A hashmap containing relation name, Relation pairs.
+pub type Relations = std::collections::HashMap<String, Relation>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Work {
     /// Name of work's publisher
@@ -102,7 +104,7 @@ pub struct Work {
     pub review: Option<Relations>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Funder {
     /// Funding body primary name
     pub name: String,
@@ -116,7 +118,7 @@ pub struct Funder {
     pub doi_asserted_by: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ClinicalTrialNumber {
     /// Identifier of the clinical trial
     #[serde(rename = "clinical-trial-number")]
@@ -128,7 +130,7 @@ pub struct ClinicalTrialNumber {
     pub type_: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Contributor {
     pub family: String,
     pub given: Option<String>,
@@ -141,12 +143,12 @@ pub struct Contributor {
     pub affiliation: Option<Vec<Affiliation>>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Affiliation {
     pub name: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Date {
     /// Contains an ordered array of year, month, day of month.
@@ -159,7 +161,7 @@ pub struct Date {
     pub date_time: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PartialDate {
     /// Contains an ordered array of year, month, day of month.
     /// Only year is required. Note that the field contains a nested array,
@@ -168,7 +170,7 @@ pub struct PartialDate {
     pub date_parts: Vec<i32>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Update {
     /// Date on which the update was published
     pub updated: PartialDate,
@@ -182,7 +184,7 @@ pub struct Update {
     pub label: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Assertion {
     pub name: String,
     pub value: String,
@@ -194,13 +196,13 @@ pub struct Assertion {
     pub group: Option<AssertionGroup>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AssertionGroup {
     pub name: String,
     pub label: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct License {
     /// Either `vor` (version of record,) `am` (accepted manuscript) or `unspecified`
@@ -214,7 +216,7 @@ pub struct License {
     pub url: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ResourceLink {
     /// Either `text-mining`, `similarity-checking` or `unspecified`
@@ -228,7 +230,7 @@ pub struct ResourceLink {
     pub content_type: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Reference {
     pub key: String,
@@ -259,7 +261,7 @@ pub struct Reference {
     pub isbn_type: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ISSN {
     pub value: String,
@@ -268,17 +270,14 @@ pub struct ISSN {
     pub type_: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ContentDomain {
     pub domain: Vec<String>,
     pub crossmark_restriction: bool,
 }
 
-/// A hashmap containing relation name, Relation pairs.
-type Relations = HashMap<String, Relation>;
-
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Relation {
     pub id_type: Option<String>,
@@ -286,7 +285,7 @@ pub struct Relation {
     pub asserted_by: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Review {
     pub running_number: Option<String>,
