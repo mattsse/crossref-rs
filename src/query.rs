@@ -1,9 +1,46 @@
+use crate::error::{Error, Result};
 use crate::model::*;
 use crate::types::Types;
 use chrono::NaiveDate;
+use serde::Serialize;
+use serde_json::Value;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Facet {}
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Facet {
+    /// Author affiliation
+    Affiliation,
+    /// Funder literal name as deposited alongside DOIs
+    FunderName,
+    /// Funder DOI
+    FunderDoi,
+    /// Contributor ORCID
+    ORCID,
+    /// Work container title, such as journal title, or book title
+    ContainerTitle,
+    /// Custom Crossmark assertion name
+    Assertion,
+    /// Archive location
+    Archive,
+    /// Significant update type
+    UpdateType,
+    /// Journal ISSN (any - print, electronic, link)
+    ISSN,
+    /// Earliest year of publication
+    Published,
+    /// Work type name, such as `journal-article` or `book-chapter`
+    TypeName,
+    /// License URI of work
+    License,
+    /// Category name of work
+    CategoryName,
+    /// Relation type described by work or described by another work with work as object
+    RelationType,
+    /// Custom Crossmark assertion group name
+    AssertionGroup,
+    /// Publisher name of work
+    PublisherName,
+}
 
 /// Filters allow you to narrow queries. All filter results are lists
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -206,18 +243,18 @@ pub enum SortOption {
     ReferenceCount,
 }
 
+/// Field queries are available on the `/works` route and allow for queries that match only particular fields of metadata.
 #[derive(Debug, Clone)]
-pub enum Query {
-    /// free form search query
-    FreeForm(String),
-    /// match any only particular fields of metadata
-    Field { name: String, value: String },
+pub struct FieldQuery {
+    /// match any only particular fields of metadata. Field queries are available on the /works route and allow for queries that match only particular fields of metadata.
+    pub name: String,
+    pub value: String,
 }
 
-impl Query {
+impl FieldQuery {
     /// creates a new [Field] query for `title` and `subtitle`
     fn title(title: &str) -> Self {
-        Query::Field {
+        Self {
             name: "title".to_string(),
             value: title.to_string(),
         }
@@ -225,42 +262,42 @@ impl Query {
 
     /// creates a new [Field] query for `container-title` aka `publication.name`
     fn container_title(container_title: &str) -> Self {
-        Query::Field {
+        Self {
             name: "container-title".to_string(),
             value: container_title.to_string(),
         }
     }
     /// creates a new [Field] query author given and family names
     fn author(author: &str) -> Self {
-        Query::Field {
+        Self {
             name: "author".to_string(),
             value: author.to_string(),
         }
     }
     /// creates a new [Field] query for editor given and family names
     fn editor(editor: &str) -> Self {
-        Query::Field {
+        Self {
             name: "editor".to_string(),
             value: editor.to_string(),
         }
     }
     /// creates a new [Field] query for chair given and family names
     fn chair(chair: &str) -> Self {
-        Query::Field {
+        Self {
             name: "chair".to_string(),
             value: chair.to_string(),
         }
     }
     /// creates a new [Field] query for translator given and family names
     fn translator(translator: &str) -> Self {
-        Query::Field {
+        Self {
             name: "translator".to_string(),
             value: translator.to_string(),
         }
     }
     /// creates a new [Field] query for author, editor, chair and translator given and family names
     fn contributor(contributor: &str) -> Self {
-        Query::Field {
+        Self {
             name: "contributor".to_string(),
             value: contributor.to_string(),
         }
@@ -268,14 +305,14 @@ impl Query {
     /// creates a new [Field] query for bibliographic information, useful for citation look up.
     /// Includes titles, authors, ISSNs and publication years
     fn bibliographic(bibliographic: &str) -> Self {
-        Query::Field {
+        Self {
             name: "bibliographic".to_string(),
             value: bibliographic.to_string(),
         }
     }
     /// creates a new [Field] query for contributor affiliations
     fn affiliation(affiliation: &str) -> Self {
-        Query::Field {
+        Self {
             name: "affiliation".to_string(),
             value: affiliation.to_string(),
         }
@@ -284,9 +321,14 @@ impl Query {
 
 pub trait CrossQuery {}
 
+/// Parameters can be used to query, filter and control the results returned by the Crossref API.
+/// They can be passed as normal URI parameters or as JSON in the body of the request.
 #[derive(Debug, Clone)]
 pub struct Params {
-    pub queries: Vec<Query>,
+    pub query: String,
+    /// Normally, an API list result will return both the summary and the items.
+    /// If you want to just retrieve the summary, you can do so by specifying that the number of rows returned should be zero.
+    pub summary_only: bool,
 }
 
 impl Params {
@@ -296,3 +338,41 @@ impl Params {
 }
 
 pub struct QueryBuilder {}
+
+/// Major resource components supported by the Crossref API
+#[derive(Debug, Clone)]
+pub enum Component {
+    /// returns a list of all works (journal articles, conference proceedings, books, components, etc), 20 per page
+    Works,
+    /// returns a list of all funders in the [Funder Registry](https://github.com/Crossref/open-funder-registry)
+    Funders,
+    /// returns a list of all Crossref members (mostly publishers)
+    Prefixes,
+    /// returns a list of valid work types
+    Members,
+    /// return a list of licenses applied to works in Crossref metadata
+    Types,
+    /// return a list of journals in the Crossref database
+    Journals,
+}
+
+#[derive(Debug, Clone)]
+pub enum ResourceComponent {
+    /// a route that only addresses a single component
+    Single(Component),
+    /// Components can be combined with an additional `works` route
+    Combined(Component),
+}
+
+pub trait QueryParam {
+    type Filter: Serialize;
+    type Params: Serialize;
+
+    fn resource_component(&self) -> Option<ResourceComponent>;
+
+    fn to_url(&self, base_path: &str) -> String;
+
+    fn to_json(&self) -> Result<Value> {
+        unimplemented!()
+    }
+}
