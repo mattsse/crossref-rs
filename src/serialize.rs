@@ -3,6 +3,9 @@ use serde::{ser, Serialize};
 
 type Result<T> = std::result::Result<T, SerdeErr>;
 
+///
+/// A Serializer used to transform a struct in url path params
+#[derive(Debug, Clone)]
 pub struct Serializer {
     output: String,
     bool_values: bool, // encoder
@@ -33,6 +36,7 @@ impl<'a> ser::Serializer for &'a mut Serializer {
     type SerializeStructVariant = Self;
 
     fn serialize_bool(self, v: bool) -> Result<()> {
+        // TODO always serialize bools?!
         self.output += if v { "true" } else { "false" };
         Ok(())
     }
@@ -377,6 +381,6 @@ mod tests {
 
         let s = to_string(&d).unwrap();
 
-        println!("{}", s);
+        assert_eq!("item1=value1&item2=true", &s);
     }
 }
