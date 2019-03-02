@@ -100,15 +100,26 @@ impl FacetCount {
     }
 }
 
-impl CrossrefQueryParam for FacetCount {
+impl ParamFragment for FacetCount {
+    fn key(&self) -> Cow<str> {
+        Cow::Borrowed(self.facet.as_str())
+    }
+    fn value(&self) -> Option<Cow<str>> {
+        Some(Cow::Owned(self.value()))
+    }
+}
+
+impl CrossrefQueryParam for Vec<FacetCount> {
     fn param_key(&self) -> Cow<str> {
         Cow::Borrowed("facet")
     }
+
     fn param_value(&self) -> Option<Cow<str>> {
-        Some(Cow::Owned(format!(
-            "{}:{}",
-            self.facet.as_str(),
-            self.value()
-        )))
+        Some(Cow::Owned(
+            self.iter()
+                .map(|x| x.fragment())
+                .collect::<Vec<_>>()
+                .join(","),
+        ))
     }
 }

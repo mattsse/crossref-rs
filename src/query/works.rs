@@ -491,7 +491,7 @@ pub struct WorksQuery {
     /// set the sort order to `asc` or `desc`
     pub order: Option<Order>,
     /// enable facet information in responses
-    pub facet: Option<FacetCount>,
+    pub facets: Vec<FacetCount>,
     /// deep page through `/works` result sets
     pub result_control: Option<WorkResultControl>,
 }
@@ -525,9 +525,9 @@ impl WorksQuery {
         self
     }
 
-    /// set facet option to query
+    /// add another facet to query
     pub fn facet(mut self, facet: FacetCount) -> Self {
-        self.facet = Some(facet);
+        self.facets.push(facet);
         self
     }
 
@@ -553,14 +553,14 @@ impl CrossrefRoute for WorksQuery {
         if !self.filter.is_empty() {
             params.push(self.filter.param());
         }
+        if !self.facets.is_empty() {
+            params.push(self.facets.param());
+        }
         if let Some(sort) = &self.sort {
             params.push(sort.param());
         }
         if let Some(order) = &self.order {
             params.push(order.param());
-        }
-        if let Some(facet) = &self.facet {
-            params.push(facet.param());
         }
         if let Some(rc) = &self.result_control {
             params.push(rc.param());

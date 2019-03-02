@@ -63,6 +63,12 @@ pub enum MessageType {
     MemberList,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Item {
+    Agency,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

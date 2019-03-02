@@ -217,7 +217,6 @@ impl CrossrefRoute for ResourceComponent {
     }
 }
 
-// TODO is filter the only multivalue param? if so, `ParamFragment` is unnecessary
 pub trait Filter: ParamFragment {}
 
 impl<T: Filter> CrossrefQueryParam for Vec<T> {
