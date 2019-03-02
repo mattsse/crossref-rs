@@ -6,13 +6,12 @@ type Result<T> = std::result::Result<T, SerdeErr>;
 ///
 /// A Serializer used to transform a struct in url path params
 #[derive(Debug, Clone)]
-pub struct Serializer {
-    output: String,
-    bool_values: bool, // encoder
-                       // baseurl
+pub(crate) struct Serializer {
+    pub output: String,
+    pub bool_values: bool, // encoder
 }
 
-pub fn to_string<T>(value: &T) -> Result<String>
+pub(crate) fn to_string<T>(value: &T) -> Result<String>
 where
     T: Serialize,
 {

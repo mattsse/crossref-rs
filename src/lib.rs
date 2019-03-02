@@ -2,8 +2,6 @@
 //#![deny(missing_docs)]
 #![allow(unused)]
 #[macro_use]
-extern crate failure;
-#[macro_use]
 extern crate serde_derive;
 
 use crate::model::ResourceLink;

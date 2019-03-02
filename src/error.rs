@@ -11,8 +11,6 @@ pub struct Error {
     ctx: Context<ErrorKind>,
 }
 
-impl Error {}
-
 impl Fail for Error {
     fn cause(&self) -> Option<&Fail> {
         self.ctx.cause()
@@ -84,5 +82,11 @@ impl From<ErrorKind> for Error {
 impl From<Context<ErrorKind>> for Error {
     fn from(ctx: Context<ErrorKind>) -> Error {
         Error { ctx }
+    }
+}
+
+impl From<SerdeErr> for Error {
+    fn from(serde: SerdeErr) -> Error {
+        serde.error
     }
 }
