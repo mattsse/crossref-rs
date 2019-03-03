@@ -1,7 +1,6 @@
 use crate::error::{Error, Result};
 use crate::model::*;
 use crate::query::works::WorkFilter;
-use crate::serialize::Serializer;
 use crate::types::Types;
 use chrono::NaiveDate;
 use serde::Serialize;

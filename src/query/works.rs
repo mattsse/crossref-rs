@@ -3,7 +3,6 @@ use crate::model::*;
 use crate::proto::MessageType::WorkList;
 use crate::query::facet::FacetCount;
 use crate::query::*;
-use crate::serialize::Serializer;
 use crate::types::Types;
 use chrono::NaiveDate;
 use serde::Serialize;

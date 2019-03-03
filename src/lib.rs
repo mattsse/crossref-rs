@@ -10,7 +10,6 @@ mod error;
 mod model;
 mod proto;
 mod query;
-mod serialize;
 mod types;
 
 #[cfg(feature = "client")]
