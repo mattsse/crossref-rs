@@ -7,7 +7,7 @@ pub type Relations = std::collections::HashMap<String, Relation>;
 
 /// Helper struct to represent dates in the cross ref api as nested arrays of numbers
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct DateParts(pub Vec<Vec<u32>>);
+pub struct DateParts(pub Vec<Vec<Option<u32>>>);
 
 impl DateParts {
     /// converts the nested array of numbers into the corresponding [DateField]
@@ -15,12 +15,12 @@ impl DateParts {
     /// if an array is empty, [None] will be returned
     pub fn as_date(&self) -> Option<DateField> {
         /// converts an array of numbers into chrono [NaiveDate] if it contains at least a single value
-        fn naive(v: &[u32]) -> Option<NaiveDate> {
+        fn naive(v: &[Option<u32>]) -> Option<NaiveDate> {
             match v.len() {
                 0 => None,
-                1 => Some(NaiveDate::from_ymd(v[0] as i32, 0, 0)),
-                2 => Some(NaiveDate::from_ymd(v[0] as i32, v[1], 0)),
-                3 => Some(NaiveDate::from_ymd(v[0] as i32, v[1], v[2])),
+                1 => Some(NaiveDate::from_ymd(v[0]? as i32, 0, 0)),
+                2 => Some(NaiveDate::from_ymd(v[0]? as i32, v[1]?, 0)),
+                3 => Some(NaiveDate::from_ymd(v[0]? as i32, v[1]?, v[2]?)),
                 _ => None,
             }
         }
@@ -391,6 +391,12 @@ pub struct Review {
     pub language: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct QueryResponse {
+    pub start_index: usize,
+    pub search_terms: Option<String>,
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402,7 +408,7 @@ mod tests {
     #[test]
     fn date_parts_serde() {
         let demo = Demo {
-            date_parts: DateParts(vec![vec![2017, 10, 11]]),
+            date_parts: DateParts(vec![vec![Some(2017), Some(10), Some(11)]]),
         };
         let expected = r##"{"date_parts":[[2017,10,11]]}"##;
         assert_eq!(expected, &to_string(&demo).unwrap());
@@ -500,7 +506,7 @@ mod tests {
     "issued": {
       "date-parts": [
         [
-          2004
+          null
         ]
       ]
     },
