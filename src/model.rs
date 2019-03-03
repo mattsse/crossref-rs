@@ -42,6 +42,10 @@ impl DateParts {
     }
 }
 
+/// the main return type of the crossref api
+/// represents a publication
+/// based on the [crossref rest-api-doc](https://github.com/CrossRef/rest-api-doc/blob/master/api_format.md#work)
+/// with minor adjustments
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Work {
@@ -51,18 +55,21 @@ pub struct Work {
     pub title: Vec<String>,
     /// Work titles in the work's original publication language
     pub original_title: Option<Vec<String>>,
+    /// the language of this work
+    pub language: Option<String>,
     /// Abstract as a JSON string or a JATS XML snippet encoded into a JSON string
     pub short_title: Option<Vec<String>>,
     /// Abstract as a JSON string or a JATS XML snippet encoded into a JSON string
     #[serde(rename = "abstract")]
-    pub abstract_: String,
+    pub abstract_: Option<String>,
     /// Count of outbound references deposited with Crossref
-    #[serde(rename = "references-count")]
     pub references_count: i32,
     /// Count of inbound references deposited with Crossref
     pub is_referenced_by_count: i32,
     /// Currently always `Crossref`
     pub source: String,
+
+    pub journal_issue: Option<Issue>,
     /// DOI prefix identifier of the form `http://id.crossref.org/prefix/DOI_PREFIX`
     pub prefix: String,
     /// DOI of the work
@@ -76,19 +83,23 @@ pub struct Work {
     /// Enumeration, one of the type ids from `https://api.crossref.org/v1/types`
     #[serde(rename = "type")]
     pub type_: String,
+    /// the day this work entry was created
+    pub created: Option<Date>,
     /// Date on which the DOI was first registered
-    pub date: Date,
+    pub date: Option<Date>,
     /// Date on which the work metadata was most recently updated
-    pub deposited: Date,
+    pub deposited: Option<Date>,
+    /// the works crossref score
+    pub score: Option<i32>,
     /// Date on which the work metadata was most recently indexed.
     /// Re-indexing does not imply a metadata change, see `deposited` for the most recent metadata change date
     pub indexed: Date,
     /// Earliest of `published-print` and `published-online`
     pub issued: PartialDate,
     /// ate on which posted content was made available online
-    pub posted: PartialDate,
+    pub posted: Option<PartialDate>,
     /// Date on which a work was accepted, after being submitted, during a submission process
-    pub accepted: PartialDate,
+    pub accepted: Option<PartialDate>,
     /// Work subtitles, including original language and translated
     pub subtitle: Option<Vec<String>>,
     /// Full titles of the containing work (usually a book or journal)
@@ -103,6 +114,7 @@ pub struct Work {
     pub volume: Option<String>,
     /// Pages numbers of an article within its journal
     pub page: Option<String>,
+    /// the number of the corresponding article
     pub article_number: Option<String>,
     /// Date on which the work was published in print
     pub published_print: Option<PartialDate>,
@@ -132,7 +144,7 @@ pub struct Work {
     pub link: Option<Vec<ResourceLink>>,
     pub clinical_trial_number: Option<Vec<ClinicalTrialNumber>>,
     /// Other identifiers for the work provided by the depositing member
-    pub alternative_id: Option<String>,
+    pub alternative_id: Option<Vec<String>>,
     /// List of references made by the work
     pub reference: Option<Vec<Reference>>,
     /// Information on domains that support Crossmark for this work
@@ -184,6 +196,7 @@ pub struct Contributor {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Affiliation {
+    /// the affiliation's name
     pub name: String,
 }
 
@@ -260,6 +273,17 @@ pub struct Assertion {
     pub label: Option<String>,
     pub order: Option<i32>,
     pub group: Option<AssertionGroup>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Issue {
+    /// Date on which the work was published in print
+    pub published_print: Option<PartialDate>,
+    /// Date on which the work was published online
+    pub published_online: Option<PartialDate>,
+    /// Issue number of an article's journal
+    pub issue: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -384,4 +408,137 @@ mod tests {
         assert_eq!(expected, &to_string(&demo).unwrap());
         assert_eq!(demo, from_str::<Demo>(expected).unwrap());
     }
+
+    #[test]
+    fn serialize_work() {
+        let work_str = r##"{
+    "indexed": {
+      "date-parts": [
+        [
+          2019,
+          2,
+          26
+        ]
+      ],
+      "date-time": "2019-02-26T10:43:14Z",
+      "timestamp": 1551177794515
+    },
+    "reference-count": 105,
+    "publisher": "American Psychological Association (APA)",
+    "issue": "1",
+    "content-domain": {
+      "domain": [],
+      "crossmark-restriction": false
+    },
+    "short-container-title": [
+      "American Psychologist"
+    ],
+    "DOI": "10.1037/0003-066x.59.1.29",
+    "type": "journal-article",
+    "created": {
+      "date-parts": [
+        [
+          2004,
+          1,
+          21
+        ]
+      ],
+      "date-time": "2004-01-21T14:31:19Z",
+      "timestamp": 1074695479000
+    },
+    "page": "29-40",
+    "source": "Crossref",
+    "is-referenced-by-count": 84,
+    "title": [
+      "How the Mind Hurts and Heals the Body."
+    ],
+    "prefix": "10.1037",
+    "volume": "59",
+    "author": [
+      {
+        "given": "Oakley",
+        "family": "Ray",
+        "sequence": "first",
+        "affiliation": []
+      }
+    ],
+    "member": "15",
+    "published-online": {
+      "date-parts": [
+        [
+          2004
+        ]
+      ]
+    },
+    "container-title": [
+      "American Psychologist"
+    ],
+    "original-title": [],
+    "language": "en",
+    "link": [
+      {
+        "URL": "http://psycnet.apa.org/journals/amp/59/1/29.pdf",
+        "content-type": "unspecified",
+        "content-version": "vor",
+        "intended-application": "similarity-checking"
+      }
+    ],
+    "deposited": {
+      "date-parts": [
+        [
+          2018,
+          4,
+          8
+        ]
+      ],
+      "date-time": "2018-04-08T18:56:17Z",
+      "timestamp": 1523213777000
+    },
+    "score": 1,
+    "subtitle": [],
+    "short-title": [],
+    "issued": {
+      "date-parts": [
+        [
+          2004
+        ]
+      ]
+    },
+    "references-count": 105,
+    "journal-issue": {
+      "published-online": {
+        "date-parts": [
+          [
+            2004
+          ]
+        ]
+      },
+      "issue": "1"
+    },
+    "alternative-id": [
+      "2004-10043-004",
+      "14736318"
+    ],
+    "URL": "http://dx.doi.org/10.1037/0003-066x.59.1.29",
+    "relation": {},
+    "ISSN": [
+      "1935-990X",
+      "0003-066X"
+    ],
+    "issn-type": [
+      {
+        "value": "0003-066X",
+        "type": "print"
+      },
+      {
+        "value": "1935-990X",
+        "type": "electronic"
+      }
+    ]
+  }
+"##;
+
+        let work: Work = from_str(work_str).unwrap();
+    }
+
 }
