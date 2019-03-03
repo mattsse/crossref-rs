@@ -569,6 +569,33 @@ impl CrossrefRoute for WorksQuery {
     }
 }
 
+impl CrossrefParams for WorksQuery {
+    type Filter = WorkFilter;
+
+    fn query_terms(&self) -> &[String] {
+        &self.free_form_queries
+    }
+    fn filters(&self) -> &[Self::Filter] {
+        &self.filter
+    }
+    fn sort(&self) -> Option<&Sort> {
+        self.sort.as_ref()
+    }
+    fn order(&self) -> Option<&Order> {
+        self.order.as_ref()
+    }
+    fn facets(&self) -> &[FacetCount] {
+        &self.facets
+    }
+    fn result_control(&self) -> Option<&ResultControl> {
+        if let Some(WorkResultControl::Standard(ref std)) = self.result_control {
+            Some(std)
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

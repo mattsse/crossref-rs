@@ -1,5 +1,6 @@
 use crate::error::{Error, Result};
 use crate::model::*;
+use crate::query::facet::FacetCount;
 use crate::query::works::WorkFilter;
 use crate::types::Types;
 use chrono::NaiveDate;
@@ -7,7 +8,135 @@ use serde::Serialize;
 use serde_json::Value;
 use std::borrow::Cow;
 
+/// Helper trait for unified interface
+pub trait CrossrefParams {
+    /// the filter applied
+    type Filter: Filter;
+    /// all string queries
+    fn query_terms(&self) -> &[String];
+    /// the filters this object can use
+    fn filters(&self) -> &[Self::Filter];
+    /// the sort if set
+    fn sort(&self) -> Option<&Sort>;
+    /// the order if set
+    fn order(&self) -> Option<&Order>;
+    /// all facets this objects addresses
+    fn facets(&self) -> &[FacetCount];
+    /// the configured result control, if any
+    fn result_control(&self) -> Option<&ResultControl>;
+}
+
+macro_rules! impl_common_query {
+    ($i:ident, $filter:ident) => {
+        /// Each query parameter is ANDed
+        #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+        pub struct $i {
+            /// search by non specific query
+            pub queries: Vec<String>,
+            /// filter to apply while querying
+            pub filter: Vec<$filter>,
+            /// sort results by a certain field and
+            pub sort: Option<Sort>,
+            /// set the sort order to `asc` or `desc`
+            pub order: Option<Order>,
+            /// enable facet information in responses
+            pub facets: Vec<FacetCount>,
+            /// deep page through `/works` result sets
+            pub result_control: Option<ResultControl>,
+        }
+
+        impl $i {
+            /// add a new free form query
+            pub fn query(mut self, query: &str) -> Self {
+                self.queries.push(query.to_string());
+                self
+            }
+            /// add a new filter to the query
+            pub fn filter(mut self, filter: $filter) -> Self {
+                self.filter.push(filter);
+                self
+            }
+
+            /// set sort option to the query
+            pub fn sort(mut self, sort: Sort) -> Self {
+                self.sort = Some(sort);
+                self
+            }
+
+            /// set order option to query
+            pub fn order(mut self, order: Order) -> Self {
+                self.order = Some(order);
+                self
+            }
+
+            /// add another facet to query
+            pub fn facet(mut self, facet: FacetCount) -> Self {
+                self.facets.push(facet);
+                self
+            }
+
+            /// set result control option to query
+            pub fn result_control(mut self, result_control: ResultControl) -> Self {
+                self.result_control = Some(result_control);
+                self
+            }
+        }
+
+        impl CrossrefParams for $i {
+            type Filter = $filter;
+
+            fn query_terms(&self) -> &[String] {
+                &self.queries
+            }
+            fn filters(&self) -> &[Self::Filter] {
+                &self.filter
+            }
+            fn sort(&self) -> Option<&Sort> {
+                self.sort.as_ref()
+            }
+            fn order(&self) -> Option<&Order> {
+                self.order.as_ref()
+            }
+            fn facets(&self) -> &[FacetCount] {
+                &self.facets
+            }
+            fn result_control(&self) -> Option<&ResultControl> {
+                self.result_control.as_ref()
+            }
+        }
+
+        impl CrossrefRoute for $i {
+            fn route(&self) -> Result<String> {
+                let mut params = Vec::new();
+                if !self.queries.is_empty() {
+                    params.push(Cow::Owned(format!(
+                        "query={}",
+                        format_queries(&self.queries)
+                    )));
+                }
+                if !self.filter.is_empty() {
+                    params.push(self.filter.param());
+                }
+                if !self.facets.is_empty() {
+                    params.push(self.facets.param());
+                }
+                if let Some(sort) = &self.sort {
+                    params.push(sort.param());
+                }
+                if let Some(order) = &self.order {
+                    params.push(order.param());
+                }
+                if let Some(rc) = &self.result_control {
+                    params.push(rc.param());
+                }
+                Ok(params.join("&"))
+            }
+        }
+    };
+}
+
 pub mod facet;
+pub mod funders;
 pub mod member;
 pub mod works;
 
@@ -16,13 +145,7 @@ pub mod filter {
     pub use super::works::WorkFilter;
 }
 
-/// filters supported for the /funders route
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum FundersFilter {
-    /// funders located in specified country
-    Location(String),
-}
-
+/// represents the visibility of an crossref item
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Visibility {
@@ -121,12 +244,18 @@ impl CrossrefQueryParam for Sort {
     }
 }
 
+/// tells crossref how many items shall be returned or where to start
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResultControl {
+    /// limits the returned items per page
     Rows(usize),
+    /// sets an offset where crossref begins to retrieve items
+    /// high offsets (~10k) result in long response times
     Offset(usize),
+    /// combines rows and offset: limit returned items per page, starting at the offset
     RowsOffset { rows: usize, offset: usize },
-    Sample,
+    /// return random results
+    Sample(usize),
 }
 
 impl CrossrefQueryParam for ResultControl {
@@ -135,18 +264,18 @@ impl CrossrefQueryParam for ResultControl {
             ResultControl::Rows(_) => Cow::Borrowed("rows"),
             ResultControl::Offset(_) => Cow::Borrowed("offset"),
             ResultControl::RowsOffset { rows, .. } => Cow::Owned(format!("rows={}", rows)),
-            ResultControl::Sample => Cow::Borrowed("sample"),
+            ResultControl::Sample(_) => Cow::Borrowed("sample"),
         }
     }
 
     fn param_value(&self) -> Option<Cow<str>> {
         match self {
-            ResultControl::Rows(r) => Some(Cow::Owned(r.to_string())),
-            ResultControl::Offset(r) => Some(Cow::Owned(r.to_string())),
+            ResultControl::Rows(r) | ResultControl::Offset(r) | ResultControl::Sample(r) => {
+                Some(Cow::Owned(r.to_string()))
+            }
             ResultControl::RowsOffset { offset, .. } => {
                 Some(Cow::Owned(format!("offset={}", offset)))
             }
-            ResultControl::Sample => None,
         }
     }
 }
@@ -216,13 +345,16 @@ impl CrossrefRoute for ResourceComponent {
     }
 }
 
+/// Helper trait to mark filters in the query string
 pub trait Filter: ParamFragment {}
 
 impl<T: Filter> CrossrefQueryParam for Vec<T> {
+    /// always use `filter` as the key
     fn param_key(&self) -> Cow<str> {
         Cow::Borrowed("filter")
     }
 
+    /// filters are multi value and values are concated with `,`
     fn param_value(&self) -> Option<Cow<str>> {
         Some(Cow::Owned(
             self.iter()
@@ -233,9 +365,15 @@ impl<T: Filter> CrossrefQueryParam for Vec<T> {
     }
 }
 
+/// represents a key value pair inside a multi value query string parameter
 pub trait ParamFragment {
+    /// the key, or name, of the fragmet
     fn key(&self) -> Cow<str>;
+
+    /// the value of the fragment, if any
     fn value(&self) -> Option<Cow<str>>;
+
+    /// key and value are concat using `:`
     fn fragment(&self) -> Cow<str> {
         if let Some(val) = self.value() {
             Cow::Owned(format!("{}:{}", self.key(), val))
@@ -245,9 +383,13 @@ pub trait ParamFragment {
     }
 }
 
+/// a trait used to capture parameters for the query string of the crossref api
 pub trait CrossrefQueryParam {
+    /// the key name of the parameter in the query string
     fn param_key(&self) -> Cow<str>;
+    /// the value of the parameter, if any
     fn param_value(&self) -> Option<Cow<str>>;
+    /// constructs the full parameter for the query string by combining the key and value
     fn param(&self) -> Cow<str> {
         if let Some(val) = self.param_value() {
             Cow::Owned(format!("{}={}", self.param_key(), val))
@@ -267,7 +409,9 @@ impl<T: AsRef<str>> CrossrefQueryParam for (T, T) {
     }
 }
 
+/// represents elements that constructs parts of the crossref request url
 pub trait CrossrefRoute {
+    /// constructs the route for the crossref api
     fn route(&self) -> Result<String>;
 }
 
@@ -282,9 +426,12 @@ impl<T: CrossrefQueryParam> CrossrefRoute for AsRef<[T]> {
     }
 }
 
+/// root level trait to construct full crossref api request urls
 pub trait CrossrefQuery: CrossrefRoute {
+    /// the resource component endpoint this route targets
     fn resource_component(&self) -> ResourceComponent;
 
+    /// constructs the full request url by concating the [base_path] with the [route]
     fn to_url(&self, base_path: &str) -> Result<String> {
         Ok(format!("{}{}", base_path, self.route()?))
     }
