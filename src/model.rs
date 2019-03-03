@@ -1,7 +1,46 @@
 // see https://github.com/Crossref/rest-api-doc/blob/master/api_format.md
 
+use chrono::NaiveDate;
+
 /// A hashmap containing relation name, Relation pairs.
 pub type Relations = std::collections::HashMap<String, Relation>;
+
+/// Helper struct to represent dates in the cross ref api as nested arrays of numbers
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct DateParts(pub Vec<Vec<u32>>);
+
+impl DateParts {
+    /// converts the nested array of numbers into the corresponding [DateField]
+    /// standalone years are allowed.
+    /// if an array is empty, [None] will be returned
+    pub fn as_date(&self) -> Option<DateField> {
+        /// converts an array of numbers into chrono [NaiveDate] if it contains at least a single value
+        fn naive(v: &[u32]) -> Option<NaiveDate> {
+            match v.len() {
+                0 => None,
+                1 => Some(NaiveDate::from_ymd(v[0] as i32, 0, 0)),
+                2 => Some(NaiveDate::from_ymd(v[0] as i32, v[1], 0)),
+                3 => Some(NaiveDate::from_ymd(v[0] as i32, v[1], v[2])),
+                _ => None,
+            }
+        }
+
+        match self.0.len() {
+            0 => None,
+            1 => Some(DateField::Single(naive(&self.0[0])?)),
+            2 => Some(DateField::Range {
+                from: naive(&self.0[0])?,
+                to: naive(&self.0[1])?,
+            }),
+            _ => Some(DateField::Multi(
+                self.0
+                    .iter()
+                    .map(|x| naive(x))
+                    .collect::<Option<Vec<_>>>()?,
+            )),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -148,26 +187,53 @@ pub struct Affiliation {
     pub name: String,
 }
 
+/// represents full date information for an item
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Date {
     /// Contains an ordered array of year, month, day of month.
     /// Only year is required. Note that the field contains a nested array,
     /// e.g. [ [ 2006, 5, 19 ] ] to conform to citeproc JSON dates
-    pub date_parts: Vec<i32>,
+    pub date_parts: DateParts,
     /// Seconds since UNIX epoch
-    pub timestamp: i32,
+    pub timestamp: usize,
     /// ISO 8601 date time
     pub date_time: String,
 }
 
+impl Date {
+    /// converts the nested array of numbers into the correct representation of chrono [NaiveDate]
+    pub fn as_date_field(&self) -> Option<DateField> {
+        self.date_parts.as_date()
+    }
+}
+
+/// represents an incomplete date only consisting of year or year and month
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PartialDate {
     /// Contains an ordered array of year, month, day of month.
-    /// Only year is required. Note that the field contains a nested array,
-    /// e.g. [ [ 2006, 5, 19 ] ] to conform to citeproc JSON dates
+    /// Only year is required
+    /// e.g. [ [ 2006 ] ] to conform to citeproc JSON dates
     #[serde(rename = "date-parts")]
-    pub date_parts: Vec<i32>,
+    pub date_parts: DateParts,
+}
+
+impl PartialDate {
+    /// converts the nested array of numbers into the correct representation of chrono [NaiveDate]
+    pub fn as_date_field(&self) -> Option<DateField> {
+        self.date_parts.as_date()
+    }
+}
+
+/// Helper struct to capture all possible occurrences of dates in the crossref api, a nested Vec of numbers
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub enum DateField {
+    /// only a single date vector
+    Single(NaiveDate),
+    /// two date vectors represent a range
+    Range { from: NaiveDate, to: NaiveDate },
+    /// more than two date vectors are present
+    Multi(Vec<NaiveDate>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -299,4 +365,23 @@ pub struct Review {
     pub type_: String,
     pub competing_interest_statement: Option<String>,
     pub language: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::*;
+    #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+    struct Demo {
+        pub date_parts: DateParts,
+    }
+    #[test]
+    fn date_parts_serde() {
+        let demo = Demo {
+            date_parts: DateParts(vec![vec![2017, 10, 11]]),
+        };
+        let expected = r##"{"date_parts":[[2017,10,11]]}"##;
+        assert_eq!(expected, &to_string(&demo).unwrap());
+        assert_eq!(demo, from_str::<Demo>(expected).unwrap());
+    }
 }
