@@ -469,11 +469,11 @@ impl CrossrefRoute for Works {
     }
 }
 
-//impl CrossrefQuery for Works {
-//    fn resource_component(&self) -> ResourceComponent {
-//        ResourceComponent::Single(Component::Works)
-//    }
-//}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorksCombined {
+    pub id: String,
+    pub query: WorksQuery,
+}
 
 ///
 /// Each query parameter is ANDed

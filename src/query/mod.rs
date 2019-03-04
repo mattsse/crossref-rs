@@ -2,7 +2,9 @@ use crate::error::{Error, Result};
 use crate::model::*;
 use crate::query::facet::FacetCount;
 use crate::query::funders::Funders;
+use crate::query::journals::Journals;
 use crate::query::member::Members;
+use crate::query::prefixes::Prefixes;
 use crate::query::types::{Type, Types};
 use crate::query::works::{WorkFilter, Works};
 use chrono::NaiveDate;
@@ -139,7 +141,9 @@ macro_rules! impl_common_query {
 
 pub mod facet;
 pub mod funders;
+pub mod journals;
 pub mod member;
+pub mod prefixes;
 pub mod types;
 pub mod works;
 
@@ -283,22 +287,6 @@ impl CrossrefQueryParam for ResultControl {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Request {
-    /// returns a list of all works (journal articles, conference proceedings, books, components, etc), 20 per page
-    Works(Works),
-    /// returns a list of all funders in the [Funder Registry](https://github.com/Crossref/open-funder-registry)
-    Funders(Funders),
-    /// returns a list of all Crossref members (mostly publishers)
-    Prefixes,
-    /// returns a list of valid work types
-    Members(Members),
-    /// return a list of licenses applied to works in Crossref metadata
-    Types(Types),
-    /// return a list of journals in the Crossref database
-    Journals,
-}
-
 /// Major resource components supported by the Crossref API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -336,30 +324,44 @@ impl CrossrefRoute for Component {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceComponent {
-    /// a route that only addresses a single component
-    Single(Component),
-    /// Components can be combined with an additional `works` route
-    Combined {
-        primary: Component,
-        identifier: String,
-    },
+    /// returns a list of all works (journal articles, conference proceedings, books, components, etc), 20 per page
+    Works(Works),
+    /// returns a list of all funders in the [Funder Registry](https://github.com/Crossref/open-funder-registry)
+    Funders(Funders),
+    /// returns a list of all Crossref members (mostly publishers)
+    Prefixes(Prefixes),
+    /// returns a list of valid work types
+    Members(Members),
+    /// return a list of licenses applied to works in Crossref metadata
+    Types(Types),
+    /// return a list of journals in the Crossref database
+    Journals(Journals),
+}
+
+impl ResourceComponent {
+    pub fn primary_component(&self) -> Component {
+        match self {
+            ResourceComponent::Works(_) => Component::Works,
+            ResourceComponent::Funders(_) => Component::Funders,
+            ResourceComponent::Prefixes(_) => Component::Prefixes,
+            ResourceComponent::Members(_) => Component::Members,
+            ResourceComponent::Types(_) => Component::Types,
+            ResourceComponent::Journals(_) => Component::Journals,
+        }
+    }
 }
 
 impl CrossrefRoute for ResourceComponent {
     fn route(&self) -> Result<String> {
         match self {
-            ResourceComponent::Single(c) => c.route(),
-            ResourceComponent::Combined {
-                primary,
-                identifier,
-            } => Ok(format!(
-                "{}/{}{}",
-                primary.route()?,
-                identifier,
-                Component::Works.route()?
-            )),
+            ResourceComponent::Works(c) => c.route(),
+            ResourceComponent::Funders(c) => c.route(),
+            ResourceComponent::Prefixes(c) => c.route(),
+            ResourceComponent::Members(c) => c.route(),
+            ResourceComponent::Types(c) => c.route(),
+            ResourceComponent::Journals(c) => c.route(),
         }
     }
 }

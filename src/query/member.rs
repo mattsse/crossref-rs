@@ -1,4 +1,5 @@
-use crate::query::works::WorkFilter;
+use crate::error::Result;
+use crate::query::works::{WorkFilter, WorksCombined, WorksQuery};
 use crate::query::*;
 use std::borrow::Cow;
 
@@ -49,6 +50,41 @@ impl_common_query!(MembersQuery, MembersFilter);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Members {
     Identifier(String),
-    Query(MembersFilter),
-    Works { id: String, work: WorkFilter },
+    Query(MembersQuery),
+    Works(WorksCombined),
+}
+
+impl CrossrefRoute for Members {
+    fn route(&self) -> Result<String> {
+        match self {
+            Members::Identifier(s) => Ok(format!("{}/{}", Component::Members.route()?, s)),
+            Members::Query(query) => {
+                let query = query.route()?;
+                if query.is_empty() {
+                    Component::Members.route()
+                } else {
+                    Ok(format!("{}?{}", Component::Members.route()?, query))
+                }
+            }
+            Members::Works(combined) => {
+                let query = combined.query.route()?;
+                if query.is_empty() {
+                    Ok(format!(
+                        "{}/{}/{}",
+                        Component::Members.route()?,
+                        combined.id,
+                        Component::Works.route()?
+                    ))
+                } else {
+                    Ok(format!(
+                        "{}/{}/{}?{}",
+                        Component::Members.route()?,
+                        combined.id,
+                        Component::Works.route()?,
+                        query
+                    ))
+                }
+            }
+        }
+    }
 }

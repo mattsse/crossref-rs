@@ -1,5 +1,6 @@
 use crate::error::{Error, ErrorKind, Result};
-use crate::query::works::WorkFilter;
+use crate::query::works::{WorkFilter, WorksCombined, WorksQuery};
+use crate::query::{Component, CrossrefRoute};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -165,7 +166,34 @@ impl Into<CrossRefType> for Type {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Types {
     Identifier(String),
-    Works { id: String, work: WorkFilter },
+    Works(WorksCombined),
+}
+
+impl CrossrefRoute for Types {
+    fn route(&self) -> Result<String> {
+        match self {
+            Types::Identifier(s) => Ok(format!("{}/{}", Component::Types.route()?, s)),
+            Types::Works(combined) => {
+                let query = combined.query.route()?;
+                if query.is_empty() {
+                    Ok(format!(
+                        "{}/{}/{}",
+                        Component::Types.route()?,
+                        combined.id,
+                        Component::Works.route()?
+                    ))
+                } else {
+                    Ok(format!(
+                        "{}/{}/{}?{}",
+                        Component::Types.route()?,
+                        combined.id,
+                        Component::Works.route()?,
+                        query
+                    ))
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -179,8 +207,8 @@ mod tests {
     "id": "book-section",
     "label": "Book Section"
   }"#;
-        //        let ref_type: Types = serde_json::from_str(section).unwrap();
+        let ref_type: Type = serde_json::from_str(section).unwrap();
 
-        //        assert_eq!(Types::BookSection, ref_type);
+        assert_eq!(Type::BookSection, ref_type);
     }
 }

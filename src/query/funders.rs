@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::query::facet::FacetCount;
-use crate::query::works::WorkFilter;
+use crate::query::works::{WorkFilter, WorksCombined, WorksQuery};
 use crate::query::*;
 use std::borrow::Cow;
 
@@ -38,6 +38,41 @@ impl_common_query!(FundersQuery, FundersFilter);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Funders {
     Identifier(String),
-    Query(FundersFilter),
-    Works { id: String, work: WorkFilter },
+    Query(FundersQuery),
+    Works(WorksCombined),
+}
+
+impl CrossrefRoute for Funders {
+    fn route(&self) -> Result<String> {
+        match self {
+            Funders::Identifier(s) => Ok(format!("{}/{}", Component::Funders.route()?, s)),
+            Funders::Query(query) => {
+                let query = query.route()?;
+                if query.is_empty() {
+                    Component::Funders.route()
+                } else {
+                    Ok(format!("{}?{}", Component::Funders.route()?, query))
+                }
+            }
+            Funders::Works(combined) => {
+                let query = combined.query.route()?;
+                if query.is_empty() {
+                    Ok(format!(
+                        "{}/{}/{}",
+                        Component::Funders.route()?,
+                        combined.id,
+                        Component::Works.route()?
+                    ))
+                } else {
+                    Ok(format!(
+                        "{}/{}/{}?{}",
+                        Component::Funders.route()?,
+                        combined.id,
+                        Component::Works.route()?,
+                        query
+                    ))
+                }
+            }
+        }
+    }
 }
