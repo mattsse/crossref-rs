@@ -1,4 +1,7 @@
 use crate::model::Work;
+use crate::model::*;
+use crate::query::facet::Facet;
+use crate::query::facet::FacetCount;
 
 /// Represents the crossref response for a `work` request.
 /// requesting an url: `https://api.crossref.org/works/10.1037/0003-066X.59.1.29/agency`
@@ -24,9 +27,25 @@ pub struct CrossrefResponse {
     pub message_type: MessageType,
     /// the version of the service created this message
     pub message_version: String,
-    // the actual message of the response
-    //    pub message: Option<Work>,
+    /// the actual message of the response
+    pub message: Option<Msg>,
+
+    /// the number of elements to expect
+    pub items_per_page: usize,
+
+    /// information about the submitted query
+    pub query: Option<QueryResponse>,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Msg {
+    pub facets: Vec<FacetResp>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum FacetResp {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
