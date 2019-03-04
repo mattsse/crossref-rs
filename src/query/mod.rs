@@ -9,7 +9,6 @@ use crate::query::types::{Type, Types};
 use crate::query::works::{WorkFilter, Works};
 use chrono::NaiveDate;
 use serde::Serialize;
-use serde_json::Value;
 use std::borrow::Cow;
 
 /// Helper trait for unified interface
@@ -50,6 +49,16 @@ macro_rules! impl_common_query {
         }
 
         impl $i {
+            /// alias for creating an empty default element
+            pub fn empty() -> Self {
+                $i::default()
+            }
+
+            /// alias for creating an new default element
+            pub fn new() -> Self {
+                $i::default()
+            }
+
             /// add a new free form query
             pub fn query(mut self, query: &str) -> Self {
                 self.queries.push(query.to_string());
@@ -151,6 +160,11 @@ pub mod filter {
     pub use super::member::MembersFilter;
     pub use super::works::WorkFilter;
 }
+
+/// reexport queries
+pub use crate::query::funders::FundersQuery;
+pub use crate::query::member::MembersQuery;
+pub use crate::query::works::{WorksCombined, WorksQuery};
 
 /// represents the visibility of an crossref item
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]

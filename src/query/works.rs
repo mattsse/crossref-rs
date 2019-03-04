@@ -468,11 +468,28 @@ impl CrossrefRoute for Works {
         }
     }
 }
-
+/// ```edition2018
+/// use crossref::{WorksCombined,WorksQuery};
+///
+/// let combined = WorksCombined::new("100000015", WorksQuery::new().query("ontologies"));
+/// ```
+/// helper struct to capture an id for a [Component] other than `/works` and an additional query for the `/works` route
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorksCombined {
+    /// the id of an component item other than `Component::Works`
     pub id: String,
+    /// the query to filter the works results
     pub query: WorksQuery,
+}
+
+impl WorksCombined {
+    /// create a WorksCombined instance
+    pub fn new(id: &str, query: WorksQuery) -> Self {
+        WorksCombined {
+            id: id.to_string(),
+            query,
+        }
+    }
 }
 
 ///
@@ -496,16 +513,50 @@ pub struct WorksQuery {
 }
 
 impl WorksQuery {
+    /// alias for creating an empty default element
+    pub fn empty() -> Self {
+        WorksQuery::default()
+    }
+
+    /// alias for creating an new default element
+    pub fn new() -> Self {
+        WorksQuery::default()
+    }
+
     /// add a new free form query
     pub fn query(mut self, query: &str) -> Self {
         self.free_form_queries.push(query.to_string());
         self
     }
+    /// ```edition2018
+    /// use crossref::WorksQuery;
+    ///
+    /// let query = WorksQuery::new().queries(&["renear", "ontologies"]);
+    /// ```
+    /// add a bunch of free form query terms
+    pub fn queries<T: ToString>(mut self, queries: &[T]) -> Self {
+        self.free_form_queries
+            .extend(queries.iter().map(T::to_string));
+        self
+    }
+
     /// add a new field query form query
     pub fn field_query(mut self, query: FieldQuery) -> Self {
         self.field_queries.push(query);
         self
     }
+
+    /// ```edition2018
+    /// use crossref::{FieldQuery,WorksQuery};
+    ///
+    /// let query = WorksQuery::new().field_queries(vec![FieldQuery::title("room at the bottom"), FieldQuery::author("richard feynman")]);
+    /// ```
+    /// add a bunch of free form query terms
+    pub fn field_queries(mut self, queries: Vec<FieldQuery>) -> Self {
+        self.field_queries.extend(queries.into_iter());
+        self
+    }
+
     /// add a new filter to the query
     pub fn filter(mut self, filter: WorkFilter) -> Self {
         self.filter.push(filter);
