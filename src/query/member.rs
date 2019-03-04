@@ -1,4 +1,5 @@
-use crate::query::{CrossrefQueryParam, Filter, ParamFragment, Visibility};
+use crate::query::works::WorkFilter;
+use crate::query::*;
 use std::borrow::Cow;
 
 /// filters supported for the `/members` route
@@ -42,3 +43,12 @@ impl ParamFragment for MembersFilter {
 }
 
 impl Filter for MembersFilter {}
+
+impl_common_query!(MembersQuery, MembersFilter);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Members {
+    Identifier(String),
+    Query(MembersFilter),
+    Works { id: String, work: WorkFilter },
+}

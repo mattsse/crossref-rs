@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::query::facet::FacetCount;
+use crate::query::works::WorkFilter;
 use crate::query::*;
 use std::borrow::Cow;
 
@@ -33,3 +34,10 @@ impl ParamFragment for FundersFilter {
 impl Filter for FundersFilter {}
 
 impl_common_query!(FundersQuery, FundersFilter);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Funders {
+    Identifier(String),
+    Query(FundersFilter),
+    Works { id: String, work: WorkFilter },
+}

@@ -1,8 +1,10 @@
 use crate::error::{Error, Result};
 use crate::model::*;
 use crate::query::facet::FacetCount;
-use crate::query::works::WorkFilter;
-use crate::types::Types;
+use crate::query::funders::Funders;
+use crate::query::member::Members;
+use crate::query::types::{Type, Types};
+use crate::query::works::{WorkFilter, Works};
 use chrono::NaiveDate;
 use serde::Serialize;
 use serde_json::Value;
@@ -138,6 +140,7 @@ macro_rules! impl_common_query {
 pub mod facet;
 pub mod funders;
 pub mod member;
+pub mod types;
 pub mod works;
 
 pub mod filter {
@@ -280,6 +283,22 @@ impl CrossrefQueryParam for ResultControl {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Request {
+    /// returns a list of all works (journal articles, conference proceedings, books, components, etc), 20 per page
+    Works(Works),
+    /// returns a list of all funders in the [Funder Registry](https://github.com/Crossref/open-funder-registry)
+    Funders(Funders),
+    /// returns a list of all Crossref members (mostly publishers)
+    Prefixes,
+    /// returns a list of valid work types
+    Members(Members),
+    /// return a list of licenses applied to works in Crossref metadata
+    Types(Types),
+    /// return a list of journals in the Crossref database
+    Journals,
+}
+
 /// Major resource components supported by the Crossref API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -354,7 +373,7 @@ impl<T: Filter> CrossrefQueryParam for Vec<T> {
         Cow::Borrowed("filter")
     }
 
-    /// filters are multi value and values are concated with `,`
+    /// filters are multi value and values are concat with `,`
     fn param_value(&self) -> Option<Cow<str>> {
         Some(Cow::Owned(
             self.iter()

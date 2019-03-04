@@ -2,8 +2,8 @@ use crate::error::{Error, Result};
 use crate::model::*;
 use crate::proto::MessageType::WorkList;
 use crate::query::facet::FacetCount;
+use crate::query::types::Type;
 use crate::query::*;
-use crate::types::Types;
 use chrono::NaiveDate;
 use serde::Serialize;
 use serde::Serializer as SerdeSerializer;
@@ -99,7 +99,7 @@ pub enum WorkFilter {
     Isbn(String),
     /// metadata records whose type = value.
     /// Type must be an ID value from the list of types returned by the `/types` resource
-    Type(Types),
+    Type(Type),
     /// metadata records whose article or serial are mentioned in the given value.
     /// Currently the only supported value is `doaj`
     Directory(String),
@@ -469,11 +469,11 @@ impl CrossrefRoute for Works {
     }
 }
 
-impl CrossrefQuery for Works {
-    fn resource_component(&self) -> ResourceComponent {
-        ResourceComponent::Single(Component::Works)
-    }
-}
+//impl CrossrefQuery for Works {
+//    fn resource_component(&self) -> ResourceComponent {
+//        ResourceComponent::Single(Component::Works)
+//    }
+//}
 
 ///
 /// Each query parameter is ANDed
@@ -599,16 +599,6 @@ impl CrossrefParams for WorksQuery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::serialize::to_string;
-
-    #[test]
-    fn serialize_works_filter() {
-        let filter = WorkFilter::FromAcceptedDate(NaiveDate::from_ymd(2019, 10, 10));
-        assert_eq!(
-            "from-accepted-date=2019-10-10",
-            &to_string(&filter).unwrap()
-        );
-    }
 
     #[test]
     fn serialize_works_ident() {
@@ -616,5 +606,4 @@ mod tests {
 
         assert_eq!("/works/10.1037/0003-066X.59.1.29", &works.route().unwrap())
     }
-
 }
