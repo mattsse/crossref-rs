@@ -415,7 +415,7 @@ impl CrossrefQueryParam for WorkResultControl {
             WorkResultControl::Standard(s) => s.param_key(),
             WorkResultControl::Cursor { token, .. } => Cow::Owned(format!(
                 "cursor={}",
-                token.as_ref().map(|x| x.as_str()).unwrap_or("*")
+                token.as_ref().map(String::as_str).unwrap_or("*")
             )),
         }
     }
@@ -430,7 +430,26 @@ impl CrossrefQueryParam for WorkResultControl {
         }
     }
 }
-
+///
+/// Retrieve a publication by DOI
+///
+/// # Example
+///
+/// ```edition2018
+/// use crossref::Works;
+///
+/// let works = Works::doi("10.1037/0003-066X.59.1.29");
+/// ```
+///
+/// Target the agency of a specific publication, where the str supplied is corresponded to the publication's DOI
+///
+/// # Example
+///
+/// ```edition2018
+/// use crossref::Works;
+///
+/// let works = Works::agency_for_doi("10.1037/0003-066X.59.1.29");
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Works {
     /// target a Work by a specific id
@@ -442,12 +461,12 @@ pub enum Works {
 }
 
 impl Works {
-    /// create a new `Works::Identifier` by converting `id` to a `String`
-    fn new_id(doi: &str) -> Self {
+    /// create a new `Works::Identifier` by converting `doi` to a `String`
+    pub fn doi(doi: &str) -> Self {
         Works::Identifier(doi.to_string())
     }
     /// create a new `Works::Agency` targeting the registration agency for the DOI
-    fn agency_for_doi(doi: &str) -> Self {
+    pub fn agency_for_doi(doi: &str) -> Self {
         Works::Agency(doi.to_string())
     }
 }
@@ -468,6 +487,10 @@ impl CrossrefRoute for Works {
         }
     }
 }
+/// Target `Works` as secondary resource component
+///
+/// # Example
+///
 /// ```edition2018
 /// use crossref::{WorksCombined,WorksQuery};
 ///
@@ -492,6 +515,16 @@ impl WorksCombined {
     }
 }
 
+/// Used to construct a query that targets crossref `Works` elements
+///
+/// # Example
+///
+/// ```edition2018
+/// use crossref::{Order, WorksQuery};
+///
+/// // create a new query for topcis machine+learning ordered desc
+/// let query = WorksQuery::new().query("machine learning").order(Order::Desc);
+/// ```
 ///
 /// Each query parameter is ANDed
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -528,6 +561,10 @@ impl WorksQuery {
         self.free_form_queries.push(query.to_string());
         self
     }
+    /// Create a new query for the topics renear+ontologies
+    ///
+    /// # Example
+    ///
     /// ```edition2018
     /// use crossref::WorksQuery;
     ///
@@ -598,7 +635,7 @@ impl CrossrefRoute for WorksQuery {
             )));
         }
         if !self.field_queries.is_empty() {
-            params.extend(self.field_queries.iter().map(|x| x.param()))
+            params.extend(self.field_queries.iter().map(CrossrefQueryParam::param))
         }
         if !self.filter.is_empty() {
             params.push(self.filter.param());
@@ -653,7 +690,7 @@ mod tests {
 
     #[test]
     fn serialize_works_ident() {
-        let works = Works::new_id("10.1037/0003-066X.59.1.29");
+        let works = Works::doi("10.1037/0003-066X.59.1.29");
 
         assert_eq!("/works/10.1037/0003-066X.59.1.29", &works.route().unwrap())
     }

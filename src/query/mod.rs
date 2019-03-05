@@ -29,6 +29,8 @@ pub trait CrossrefParams {
     fn result_control(&self) -> Option<&ResultControl>;
 }
 
+// TODO extract Query impl into separate trait
+
 macro_rules! impl_common_query {
     ($i:ident, $filter:ident) => {
         /// Each query parameter is ANDed
@@ -76,6 +78,17 @@ macro_rules! impl_common_query {
                 self
             }
 
+            /// set order to asc
+            pub fn order_asc(mut self) -> Self {
+                self.order = Some(Order::Asc);
+                self
+            }
+            /// set order to desc
+            pub fn order_desc(mut self) -> Self {
+                self.order = Some(Order::Desc);
+                self
+            }
+
             /// set order option to query
             pub fn order(mut self, order: Order) -> Self {
                 self.order = Some(order);
@@ -93,6 +106,11 @@ macro_rules! impl_common_query {
                 self.result_control = Some(result_control);
                 self
             }
+
+            //            /// limit the publications that should be returned
+            //            pub fn rows(mut self, usize) -> Self {
+            //                if let Some(ResultControl::)
+            //            }
         }
 
         impl CrossrefParams for $i {
@@ -338,6 +356,9 @@ impl CrossrefRoute for Component {
     }
 }
 
+/// bundles all available crossref api endpoints
+///
+///
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceComponent {
     /// returns a list of all works (journal articles, conference proceedings, books, components, etc), 20 per page
@@ -393,7 +414,7 @@ impl<T: Filter> CrossrefQueryParam for Vec<T> {
     fn param_value(&self) -> Option<Cow<str>> {
         Some(Cow::Owned(
             self.iter()
-                .map(|x| x.fragment())
+                .map(ParamFragment::fragment)
                 .collect::<Vec<_>>()
                 .join(","),
         ))
@@ -402,7 +423,7 @@ impl<T: Filter> CrossrefQueryParam for Vec<T> {
 
 /// represents a key value pair inside a multi value query string parameter
 pub trait ParamFragment {
-    /// the key, or name, of the fragmet
+    /// the key, or name, of the fragment
     fn key(&self) -> Cow<str>;
 
     /// the value of the fragment, if any
@@ -455,7 +476,7 @@ impl<T: CrossrefQueryParam> CrossrefRoute for AsRef<[T]> {
         Ok(self
             .as_ref()
             .iter()
-            .map(|x| x.param())
+            .map(CrossrefQueryParam::param)
             .collect::<Vec<_>>()
             .join("&"))
     }

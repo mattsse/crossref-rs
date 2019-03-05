@@ -117,7 +117,7 @@ impl CrossrefQueryParam for Vec<FacetCount> {
     fn param_value(&self) -> Option<Cow<str>> {
         Some(Cow::Owned(
             self.iter()
-                .map(|x| x.fragment())
+                .map(ParamFragment::fragment)
                 .collect::<Vec<_>>()
                 .join(","),
         ))

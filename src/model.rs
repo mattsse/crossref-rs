@@ -131,7 +131,7 @@ pub struct Work {
     pub isbn: Option<Vec<String>>,
     pub archive: Option<Vec<String>>,
     pub license: Option<Vec<License>>,
-    pub funder: Option<Vec<Funder>>,
+    pub funder: Option<Vec<FundingBody>>,
     pub assertion: Option<Vec<Assertion>>,
     pub author: Option<Vec<Contributor>>,
     pub editor: Option<Vec<Contributor>>,
@@ -156,7 +156,7 @@ pub struct Work {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct Funder {
+pub struct FundingBody {
     /// Funding body primary name
     pub name: String,
     /// Optional [Open Funder Registry](http://www.crossref.org/fundingdata/registry.html) DOI uniquely identifing the funding body
@@ -289,6 +289,12 @@ pub struct Issue {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AssertionGroup {
     pub name: String,
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct Agency {
+    pub id: String,
     pub label: Option<String>,
 }
 
