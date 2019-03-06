@@ -2,6 +2,8 @@ use crate::model::Work;
 use crate::model::*;
 use crate::query::facet::Facet;
 use crate::query::facet::FacetCount;
+use crate::query::Visibility;
+use serde_json::Value;
 use std::collections::HashMap;
 
 /// Represents the crossref response for a `work` request.
@@ -96,7 +98,7 @@ pub struct FacetItem {
     pub values: HashMap<String, usize>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum ResponseMessage {
     Agency {
@@ -135,7 +137,7 @@ pub struct Funder {
     pub hierarchy: HashMap<String, HashMap<String, HashMap<String, bool>>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
 pub struct Member {
     pub last_status_check_time: usize,
@@ -143,9 +145,18 @@ pub struct Member {
     pub counts: Counts,
     pub breakdowns: Breakdowns,
     pub prefixes: Vec<String>,
+    pub coverage: Coverage,
+    pub prefix: Vec<Prefix>,
+    pub id: usize,
+    pub tokens: Vec<String>,
+    pub counts_type: HashMap<String, HashMap<String, usize>>,
+    pub coverage_type: Value,
+    pub flags: HashMap<String, bool>,
+    pub location: String,
+    pub names: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
 pub struct Counts {
     pub total_dois: usize,
@@ -153,10 +164,46 @@ pub struct Counts {
     pub backfile_dois: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
 pub struct Breakdowns {
     pub dois_by_issued_year: Vec<Vec<u32>>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", default)]
+pub struct Coverage {
+    pub affiliations_current: f32,
+    pub similarity_checking_current: f32,
+    pub funders_backfile: f32,
+    pub licenses_backfile: f32,
+    pub funders_current: f32,
+    pub affiliations_backfile: f32,
+    pub resource_links_backfile: f32,
+    pub orcids_backfile: f32,
+    pub update_policies_current: f32,
+    pub open_references_backfile: f32,
+    pub orcids_current: f32,
+    pub similarity_checking_backfile: f32,
+    pub references_backfile: f32,
+    pub award_numbers_backfile: f32,
+    pub update_policies_backfile: f32,
+    pub licenses_current: f32,
+    pub award_numbers_current: f32,
+    pub abstracts_backfile: f32,
+    pub resource_links_current: f32,
+    pub abstracts_current: f32,
+    pub open_references_current: f32,
+    pub references_current: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case", default)]
+pub struct Prefix {
+    pub value: String,
+    pub name: String,
+    pub public_references: bool,
+    pub reference_visibility: Option<Visibility>,
 }
 
 #[cfg(test)]
@@ -209,16 +256,10 @@ mod tests {
 
         let agency: ResponseMessage = from_str(agency_str).unwrap();
 
-        assert_eq!(
-            ResponseMessage::Agency {
-                doi: "10.1037/0003-066x.59.1.29".to_string(),
-                agency: Agency {
-                    id: "crossref".to_string(),
-                    label: Some("Crossref".to_string())
-                }
-            },
-            agency
-        );
+        match agency {
+            ResponseMessage::Agency { .. } => {}
+            _ => panic!("expected Agency"),
+        }
     }
 
     #[test]
@@ -294,6 +335,26 @@ mod tests {
         match prefix {
             ResponseMessage::Prefix { .. } => {}
             _ => panic!("expected Prefix"),
+        }
+    }
+    #[test]
+    fn members_list_msg_deserialize() {
+        let members_list_str = r#"[{"last-status-check-time":1551766727771,"primary-name":"Society for Leukocyte Biology","counts":{"total-dois":0,"current-dois":0,"backfile-dois":0},"breakdowns":{"dois-by-issued-year":[]},"prefixes":["10.1189"],"coverage":{"affiliations-current":0,"similarity-checking-current":0,"funders-backfile":0,"licenses-backfile":0,"funders-current":0,"affiliations-backfile":0,"resource-links-backfile":0,"orcids-backfile":0,"update-policies-current":0,"open-references-backfile":0,"orcids-current":0,"similarity-checking-backfile":0,"references-backfile":0,"award-numbers-backfile":0,"update-policies-backfile":0,"licenses-current":0,"award-numbers-current":0,"abstracts-backfile":0,"resource-links-current":0,"abstracts-current":0,"open-references-current":0,"references-current":0},"prefix":[{"value":"10.1189","name":"Society for Leukocyte Biology","public-references":false,"reference-visibility":"limited"}],"id":183,"tokens":["society","for","leukocyte","biology"],"counts-type":{"all":{},"current":{},"backfile":{}},"coverage-type":{"all":null,"backfile":null,"current":null},"flags":{"deposits-abstracts-current":false,"deposits-orcids-current":false,"deposits":false,"deposits-affiliations-backfile":false,"deposits-update-policies-backfile":false,"deposits-similarity-checking-backfile":false,"deposits-award-numbers-current":false,"deposits-resource-links-current":false,"deposits-articles":false,"deposits-affiliations-current":false,"deposits-funders-current":false,"deposits-references-backfile":false,"deposits-abstracts-backfile":false,"deposits-licenses-backfile":false,"deposits-award-numbers-backfile":false,"deposits-open-references-backfile":false,"deposits-open-references-current":false,"deposits-references-current":false,"deposits-resource-links-backfile":false,"deposits-orcids-backfile":false,"deposits-funders-backfile":false,"deposits-update-policies-current":false,"deposits-similarity-checking-current":false,"deposits-licenses-current":false},"location":"9650 Rockville Pike Attn: Lynn Willis Bethesda MD 20814 United States","names":["Society for Leukocyte Biology"]}]"#;
+
+        let members_list: ResponseMessage = from_str(members_list_str).unwrap();
+        match members_list {
+            ResponseMessage::MemberList(_) => {}
+            _ => panic!("expected MemberList"),
+        }
+    }
+    #[test]
+    fn member_msg_deserialize() {
+        let member_str = r#"{"last-status-check-time":1551766727771,"primary-name":"Society for Leukocyte Biology","counts":{"total-dois":0,"current-dois":0,"backfile-dois":0},"breakdowns":{"dois-by-issued-year":[]},"prefixes":["10.1189"],"coverage":{"affiliations-current":0,"similarity-checking-current":0,"funders-backfile":0,"licenses-backfile":0,"funders-current":0,"affiliations-backfile":0,"resource-links-backfile":0,"orcids-backfile":0,"update-policies-current":0,"open-references-backfile":0,"orcids-current":0,"similarity-checking-backfile":0,"references-backfile":0,"award-numbers-backfile":0,"update-policies-backfile":0,"licenses-current":0,"award-numbers-current":0,"abstracts-backfile":0,"resource-links-current":0,"abstracts-current":0,"open-references-current":0,"references-current":0},"prefix":[{"value":"10.1189","name":"Society for Leukocyte Biology","public-references":false,"reference-visibility":"limited"}],"id":183,"tokens":["society","for","leukocyte","biology"],"counts-type":{"all":{},"current":{},"backfile":{}},"coverage-type":{"all":null,"backfile":null,"current":null},"flags":{"deposits-abstracts-current":false,"deposits-orcids-current":false,"deposits":false,"deposits-affiliations-backfile":false,"deposits-update-policies-backfile":false,"deposits-similarity-checking-backfile":false,"deposits-award-numbers-current":false,"deposits-resource-links-current":false,"deposits-articles":false,"deposits-affiliations-current":false,"deposits-funders-current":false,"deposits-references-backfile":false,"deposits-abstracts-backfile":false,"deposits-licenses-backfile":false,"deposits-award-numbers-backfile":false,"deposits-open-references-backfile":false,"deposits-open-references-current":false,"deposits-references-current":false,"deposits-resource-links-backfile":false,"deposits-orcids-backfile":false,"deposits-funders-backfile":false,"deposits-update-policies-current":false,"deposits-similarity-checking-current":false,"deposits-licenses-current":false},"location":"9650 Rockville Pike Attn: Lynn Willis Bethesda MD 20814 United States","names":["Society for Leukocyte Biology"]}"#;
+
+        let member: ResponseMessage = from_str(member_str).unwrap();
+        match member {
+            ResponseMessage::Member(_) => {}
+            _ => panic!("expected Member"),
         }
     }
 }
