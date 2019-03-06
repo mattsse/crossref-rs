@@ -84,6 +84,7 @@ pub enum MessageType {
     FunderList,
     PrefixList,
     MemberList,
+    JournalList,
 }
 
 // TODO impl custom map deserializer https://serde.rs/deserialize-map.html
@@ -111,18 +112,21 @@ pub enum ResponseMessage {
         name: String,
         prefix: String,
     },
-    Funder(Box<Funder>),
-    FunderList(Vec<Funder>),
     Work(Box<Work>),
     WorkList(Vec<Work>),
     MemberList(Vec<Member>),
     Member(Box<Member>),
+    Journal(Box<Journal>),
+    JournalList(Vec<Journal>),
+    Funder(Box<Funder>),
+    FunderList(Vec<Funder>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
 pub struct Funder {
     pub hierarchy_names: HashMap<String, Option<String>>,
+    pub hierarchy: HashMap<String, HashMap<String, HashMap<String, bool>>>,
     pub id: String,
     pub location: String,
     pub work_count: Option<usize>,
@@ -134,14 +138,13 @@ pub struct Funder {
     pub replaces: Vec<String>,
     pub replaced_by: Vec<String>,
     pub tokens: Vec<String>,
-    pub hierarchy: HashMap<String, HashMap<String, HashMap<String, bool>>>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
 pub struct Member {
-    pub last_status_check_time: usize,
     pub primary_name: String,
+    pub last_status_check_time: usize,
     pub counts: Counts,
     pub breakdowns: Breakdowns,
     pub prefixes: Vec<String>,
@@ -197,13 +200,31 @@ pub struct Coverage {
     pub references_current: f32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
 pub struct Prefix {
     pub value: String,
     pub name: String,
     pub public_references: bool,
     pub reference_visibility: Option<Visibility>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Journal {
+    /// could not determine type, possible PartialDateParts
+    pub last_status_check_time: Option<Value>,
+    pub counts: Option<usize>,
+    pub breakdowns: Option<Value>,
+    pub publisher: Option<String>,
+    pub coverage: Option<Value>,
+    pub title: Option<String>,
+    pub subjects: Vec<Value>,
+    pub coverage_type: Option<Value>,
+    pub flags: Option<Value>,
+    #[serde(rename = "ISSN")]
+    pub issn: Vec<String>,
+    pub issn_type: Vec<String>,
 }
 
 #[cfg(test)]
@@ -355,6 +376,29 @@ mod tests {
         match member {
             ResponseMessage::Member(_) => {}
             _ => panic!("expected Member"),
+        }
+    }
+
+    #[test]
+    fn journals_list_msg_deserialize() {
+        let journal_list_str = r#"[{"last-status-check-time":null,"counts":null,"breakdowns":null,"publisher":"Fundacao Educacional de Criciuma- FUCRI","coverage":null,"title":"A INFLU\u00caNCIA DA PUBLICIDADE NA TRANSI\u00c7\u00c3O NUTRICIONAL UMA S\u00cdNTESE PARA ENTENDER A OBESIDADE","subjects":[],"coverage-type":null,"flags":null,"ISSN":[],"issn-type":[]}]"#;
+
+        let journal_list: ResponseMessage = from_str(journal_list_str).unwrap();
+
+        match journal_list {
+            ResponseMessage::JournalList(_) => {}
+            _ => panic!("expected JournalList"),
+        }
+    }
+    #[test]
+    fn journal_msg_deserialize() {
+        let journal_str = r#"{"last-status-check-time":null,"counts":null,"breakdowns":null,"publisher":"Fundacao Educacional de Criciuma- FUCRI","coverage":null,"title":"A INFLU\u00caNCIA DA PUBLICIDADE NA TRANSI\u00c7\u00c3O NUTRICIONAL UMA S\u00cdNTESE PARA ENTENDER A OBESIDADE","subjects":[],"coverage-type":null,"flags":null,"ISSN":[],"issn-type":[]}"#;
+
+        let journal: ResponseMessage = from_str(journal_str).unwrap();
+
+        match journal {
+            ResponseMessage::Journal(_) => {}
+            _ => panic!("expected Journal"),
         }
     }
 }
