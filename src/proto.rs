@@ -2,6 +2,7 @@ use crate::model::Work;
 use crate::model::*;
 use crate::query::facet::Facet;
 use crate::query::facet::FacetCount;
+use crate::query::types::CrossRefType;
 use crate::query::Visibility;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -112,6 +113,8 @@ pub enum ResponseMessage {
         name: String,
         prefix: String,
     },
+    Type(CrossRefType),
+    TypeList(Vec<CrossRefType>),
     Work(Box<Work>),
     WorkList(Vec<Work>),
     MemberList(Vec<Member>),
@@ -399,6 +402,26 @@ mod tests {
         match journal {
             ResponseMessage::Journal(_) => {}
             _ => panic!("expected Journal"),
+        }
+    }
+
+    #[test]
+    fn type_list_msg_deserialize() {
+        let type_list_str = r#"[{"id":"book-section","label":"Book Section"},{"id":"monograph","label":"Monograph"}]"#;
+        let type_list: ResponseMessage = from_str(type_list_str).unwrap();
+        match type_list {
+            ResponseMessage::TypeList(_) => {}
+            _ => panic!("expected TypeList"),
+        }
+    }
+    #[test]
+    fn type_msg_deserialize() {
+        let type_str = r#"{"id":"book-section","label":"Book Section"}"#;
+        let type_: ResponseMessage = from_str(type_str).unwrap();
+
+        match type_ {
+            ResponseMessage::Type(_) => {}
+            _ => panic!("expected Type"),
         }
     }
 }
