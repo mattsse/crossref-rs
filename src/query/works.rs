@@ -11,7 +11,7 @@ use std::borrow::Cow;
 /// Filters allow you to narrow queries. All filter results are lists
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum WorkFilter {
+pub enum WorksFilter {
     /// metadata which includes one or more funder entry
     HasFunder,
     /// metadata which include the `id` in FundRef data
@@ -156,140 +156,140 @@ pub enum WorkFilter {
     RelationObjectType(String),
 }
 
-impl WorkFilter {
+impl WorksFilter {
     /// the identifier for a the query key
     pub fn name(&self) -> &str {
         match self {
-            WorkFilter::HasFunder => "has-funder",
-            WorkFilter::Funder(_) => "funder",
-            WorkFilter::Location(_) => "location",
-            WorkFilter::Prefix(_) => "prefix",
-            WorkFilter::Member(_) => "member",
-            WorkFilter::FromIndexDate(_) => "from-index-date",
-            WorkFilter::UntilIndexDate(_) => "until-index-date",
-            WorkFilter::FromDepositDate(_) => "from-deposit-date",
-            WorkFilter::UntilDepositDate(_) => "until-deposit-date",
-            WorkFilter::FromUpdateDate(_) => "from-update-date",
-            WorkFilter::UntilUpdateDate(_) => "until-update-date",
-            WorkFilter::FromCreatedDate(_) => "from-created-date",
-            WorkFilter::UntilCreatedDate(_) => "until-created-date",
-            WorkFilter::FromPubDate(_) => "from-pub-date",
-            WorkFilter::UntilPubDate(_) => "until-pub-date",
-            WorkFilter::FromOnlinePubDate(_) => "from-online-pub-date",
-            WorkFilter::UntilOnlinePubDate(_) => "until-online-pub-date",
-            WorkFilter::FromPrintPubDate(_) => "from-print-pub-date",
-            WorkFilter::UntilPrintPubDate(_) => "until-print-pub-date",
-            WorkFilter::FromPostedDate(_) => "from-posted-date",
-            WorkFilter::UntilPostedDate(_) => "until-posted-date",
-            WorkFilter::FromAcceptedDate(_) => "from-accepted-date",
-            WorkFilter::UntilAcceptedDate(_) => "until-accepted-date",
-            WorkFilter::HasLicense => "has-license",
-            WorkFilter::LicenseUrl(_) => "license.url",
-            WorkFilter::LicenseVersion(_) => "license.version",
-            WorkFilter::LicenseDelay(_) => "license.delay",
-            WorkFilter::HasFullText => "has-full-text",
-            WorkFilter::FullTextVersion(_) => "full-text.version",
-            WorkFilter::FullTextType(_) => "full-text.type",
-            WorkFilter::FullTextApplication(_) => "full-text.application",
-            WorkFilter::HasReferences => "has-references",
-            WorkFilter::ReferenceVisibility(_) => "reference-visibility",
-            WorkFilter::HasArchive => "has-archive",
-            WorkFilter::Archive(_) => "archive",
-            WorkFilter::HasOrcid => "has-orcid",
-            WorkFilter::HasAuthenticatedOrcid => "has-authenticated-orcid",
-            WorkFilter::Orcid(_) => "orcid",
-            WorkFilter::Issn(_) => "issn",
-            WorkFilter::Isbn(_) => "isbn",
-            WorkFilter::Type(_) => "type",
-            WorkFilter::Directory(_) => "directory",
-            WorkFilter::Doi(_) => "doi",
-            WorkFilter::Updates(_) => "updates",
-            WorkFilter::IsUpdate => "is-update",
-            WorkFilter::HasUpdatePolicy => "has-update-policy",
-            WorkFilter::ContainerTitle(_) => "container-title",
-            WorkFilter::CategoryName(_) => "category-name",
-            WorkFilter::TypeName(_) => "type-name",
-            WorkFilter::AwardNumber(_) => "award.number",
-            WorkFilter::AwardFunder(_) => "award.funder",
-            WorkFilter::HasAssertion => "has-assertion",
-            WorkFilter::AssertionGroup(_) => "assertion-group",
-            WorkFilter::Assertion(_) => "assertion",
-            WorkFilter::HasAffiliation => "has-affiliation",
-            WorkFilter::AlternativeId => "alternative-id",
-            WorkFilter::ArticleNumber => "article-number",
-            WorkFilter::HasAbstract => "has-abstract",
-            WorkFilter::HasClinicalTrialNumber => "has-clinical-trial-number	",
-            WorkFilter::ContentDomain(_) => "content-domain",
-            WorkFilter::HasContentDomain => "has-content-domain",
-            WorkFilter::HasDomainRestriction => "has-domain-restriction",
-            WorkFilter::HasRelation => "has-relation",
-            WorkFilter::RelationType => "relation.type",
-            WorkFilter::RelationObject => "relation.object",
-            WorkFilter::RelationObjectType(_) => "relation.object-type",
+            WorksFilter::HasFunder => "has-funder",
+            WorksFilter::Funder(_) => "funder",
+            WorksFilter::Location(_) => "location",
+            WorksFilter::Prefix(_) => "prefix",
+            WorksFilter::Member(_) => "member",
+            WorksFilter::FromIndexDate(_) => "from-index-date",
+            WorksFilter::UntilIndexDate(_) => "until-index-date",
+            WorksFilter::FromDepositDate(_) => "from-deposit-date",
+            WorksFilter::UntilDepositDate(_) => "until-deposit-date",
+            WorksFilter::FromUpdateDate(_) => "from-update-date",
+            WorksFilter::UntilUpdateDate(_) => "until-update-date",
+            WorksFilter::FromCreatedDate(_) => "from-created-date",
+            WorksFilter::UntilCreatedDate(_) => "until-created-date",
+            WorksFilter::FromPubDate(_) => "from-pub-date",
+            WorksFilter::UntilPubDate(_) => "until-pub-date",
+            WorksFilter::FromOnlinePubDate(_) => "from-online-pub-date",
+            WorksFilter::UntilOnlinePubDate(_) => "until-online-pub-date",
+            WorksFilter::FromPrintPubDate(_) => "from-print-pub-date",
+            WorksFilter::UntilPrintPubDate(_) => "until-print-pub-date",
+            WorksFilter::FromPostedDate(_) => "from-posted-date",
+            WorksFilter::UntilPostedDate(_) => "until-posted-date",
+            WorksFilter::FromAcceptedDate(_) => "from-accepted-date",
+            WorksFilter::UntilAcceptedDate(_) => "until-accepted-date",
+            WorksFilter::HasLicense => "has-license",
+            WorksFilter::LicenseUrl(_) => "license.url",
+            WorksFilter::LicenseVersion(_) => "license.version",
+            WorksFilter::LicenseDelay(_) => "license.delay",
+            WorksFilter::HasFullText => "has-full-text",
+            WorksFilter::FullTextVersion(_) => "full-text.version",
+            WorksFilter::FullTextType(_) => "full-text.type",
+            WorksFilter::FullTextApplication(_) => "full-text.application",
+            WorksFilter::HasReferences => "has-references",
+            WorksFilter::ReferenceVisibility(_) => "reference-visibility",
+            WorksFilter::HasArchive => "has-archive",
+            WorksFilter::Archive(_) => "archive",
+            WorksFilter::HasOrcid => "has-orcid",
+            WorksFilter::HasAuthenticatedOrcid => "has-authenticated-orcid",
+            WorksFilter::Orcid(_) => "orcid",
+            WorksFilter::Issn(_) => "issn",
+            WorksFilter::Isbn(_) => "isbn",
+            WorksFilter::Type(_) => "type",
+            WorksFilter::Directory(_) => "directory",
+            WorksFilter::Doi(_) => "doi",
+            WorksFilter::Updates(_) => "updates",
+            WorksFilter::IsUpdate => "is-update",
+            WorksFilter::HasUpdatePolicy => "has-update-policy",
+            WorksFilter::ContainerTitle(_) => "container-title",
+            WorksFilter::CategoryName(_) => "category-name",
+            WorksFilter::TypeName(_) => "type-name",
+            WorksFilter::AwardNumber(_) => "award.number",
+            WorksFilter::AwardFunder(_) => "award.funder",
+            WorksFilter::HasAssertion => "has-assertion",
+            WorksFilter::AssertionGroup(_) => "assertion-group",
+            WorksFilter::Assertion(_) => "assertion",
+            WorksFilter::HasAffiliation => "has-affiliation",
+            WorksFilter::AlternativeId => "alternative-id",
+            WorksFilter::ArticleNumber => "article-number",
+            WorksFilter::HasAbstract => "has-abstract",
+            WorksFilter::HasClinicalTrialNumber => "has-clinical-trial-number	",
+            WorksFilter::ContentDomain(_) => "content-domain",
+            WorksFilter::HasContentDomain => "has-content-domain",
+            WorksFilter::HasDomainRestriction => "has-domain-restriction",
+            WorksFilter::HasRelation => "has-relation",
+            WorksFilter::RelationType => "relation.type",
+            WorksFilter::RelationObject => "relation.object",
+            WorksFilter::RelationObjectType(_) => "relation.object-type",
         }
     }
 }
 
-impl ParamFragment for WorkFilter {
+impl ParamFragment for WorksFilter {
     fn key(&self) -> Cow<str> {
         Cow::Borrowed(self.name())
     }
 
     fn value(&self) -> Option<Cow<str>> {
         match self {
-            WorkFilter::Funder(s)
-            | WorkFilter::Location(s)
-            | WorkFilter::Prefix(s)
-            | WorkFilter::Member(s)
-            | WorkFilter::LicenseUrl(s)
-            | WorkFilter::LicenseVersion(s)
-            | WorkFilter::FullTextVersion(s)
-            | WorkFilter::FullTextType(s)
-            | WorkFilter::FullTextApplication(s)
-            | WorkFilter::Archive(s)
-            | WorkFilter::Orcid(s)
-            | WorkFilter::Issn(s)
-            | WorkFilter::Isbn(s)
-            | WorkFilter::Directory(s)
-            | WorkFilter::Doi(s)
-            | WorkFilter::Updates(s)
-            | WorkFilter::ContainerTitle(s)
-            | WorkFilter::CategoryName(s)
-            | WorkFilter::AwardNumber(s)
-            | WorkFilter::TypeName(s)
-            | WorkFilter::AwardFunder(s)
-            | WorkFilter::AssertionGroup(s)
-            | WorkFilter::Assertion(s)
-            | WorkFilter::ContentDomain(s)
-            | WorkFilter::RelationObjectType(s) => Some(Cow::Borrowed(s.as_str())),
-            WorkFilter::ReferenceVisibility(vis) => Some(Cow::Borrowed(vis.as_str())),
-            WorkFilter::FromIndexDate(d)
-            | WorkFilter::UntilIndexDate(d)
-            | WorkFilter::FromDepositDate(d)
-            | WorkFilter::UntilDepositDate(d)
-            | WorkFilter::FromUpdateDate(d)
-            | WorkFilter::UntilUpdateDate(d)
-            | WorkFilter::FromCreatedDate(d)
-            | WorkFilter::UntilCreatedDate(d)
-            | WorkFilter::FromPubDate(d)
-            | WorkFilter::UntilPubDate(d)
-            | WorkFilter::FromOnlinePubDate(d)
-            | WorkFilter::UntilOnlinePubDate(d)
-            | WorkFilter::FromPrintPubDate(d)
-            | WorkFilter::UntilPrintPubDate(d)
-            | WorkFilter::FromPostedDate(d)
-            | WorkFilter::UntilPostedDate(d)
-            | WorkFilter::FromAcceptedDate(d)
-            | WorkFilter::UntilAcceptedDate(d) => {
+            WorksFilter::Funder(s)
+            | WorksFilter::Location(s)
+            | WorksFilter::Prefix(s)
+            | WorksFilter::Member(s)
+            | WorksFilter::LicenseUrl(s)
+            | WorksFilter::LicenseVersion(s)
+            | WorksFilter::FullTextVersion(s)
+            | WorksFilter::FullTextType(s)
+            | WorksFilter::FullTextApplication(s)
+            | WorksFilter::Archive(s)
+            | WorksFilter::Orcid(s)
+            | WorksFilter::Issn(s)
+            | WorksFilter::Isbn(s)
+            | WorksFilter::Directory(s)
+            | WorksFilter::Doi(s)
+            | WorksFilter::Updates(s)
+            | WorksFilter::ContainerTitle(s)
+            | WorksFilter::CategoryName(s)
+            | WorksFilter::AwardNumber(s)
+            | WorksFilter::TypeName(s)
+            | WorksFilter::AwardFunder(s)
+            | WorksFilter::AssertionGroup(s)
+            | WorksFilter::Assertion(s)
+            | WorksFilter::ContentDomain(s)
+            | WorksFilter::RelationObjectType(s) => Some(Cow::Borrowed(s.as_str())),
+            WorksFilter::ReferenceVisibility(vis) => Some(Cow::Borrowed(vis.as_str())),
+            WorksFilter::FromIndexDate(d)
+            | WorksFilter::UntilIndexDate(d)
+            | WorksFilter::FromDepositDate(d)
+            | WorksFilter::UntilDepositDate(d)
+            | WorksFilter::FromUpdateDate(d)
+            | WorksFilter::UntilUpdateDate(d)
+            | WorksFilter::FromCreatedDate(d)
+            | WorksFilter::UntilCreatedDate(d)
+            | WorksFilter::FromPubDate(d)
+            | WorksFilter::UntilPubDate(d)
+            | WorksFilter::FromOnlinePubDate(d)
+            | WorksFilter::UntilOnlinePubDate(d)
+            | WorksFilter::FromPrintPubDate(d)
+            | WorksFilter::UntilPrintPubDate(d)
+            | WorksFilter::FromPostedDate(d)
+            | WorksFilter::UntilPostedDate(d)
+            | WorksFilter::FromAcceptedDate(d)
+            | WorksFilter::UntilAcceptedDate(d) => {
                 Some(Cow::Owned(d.format("%Y-%m-%d").to_string()))
             }
-            WorkFilter::Type(t) => Some(Cow::Borrowed(t.id())),
+            WorksFilter::Type(t) => Some(Cow::Borrowed(t.id())),
             _ => Some(Cow::Borrowed("true")),
         }
     }
 }
 
-impl Filter for WorkFilter {}
+impl Filter for WorksFilter {}
 
 /// Field queries are available on the `/works` route and allow for queries that match only particular fields of metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -487,6 +487,12 @@ impl CrossrefRoute for Works {
         }
     }
 }
+
+impl CrossrefQuery for Works {
+    fn resource_component(self) -> ResourceComponent {
+        ResourceComponent::Works(self)
+    }
+}
 /// Target `Works` as secondary resource component
 ///
 /// # Example
@@ -534,7 +540,7 @@ pub struct WorksQuery {
     /// match only particular fields of metadata
     pub field_queries: Vec<FieldQuery>,
     /// filter to apply while querying
-    pub filter: Vec<WorkFilter>,
+    pub filter: Vec<WorksFilter>,
     /// sort results by a certain field and
     pub sort: Option<Sort>,
     /// set the sort order to `asc` or `desc`
@@ -595,7 +601,7 @@ impl WorksQuery {
     }
 
     /// add a new filter to the query
-    pub fn filter(mut self, filter: WorkFilter) -> Self {
+    pub fn filter(mut self, filter: WorksFilter) -> Self {
         self.filter.push(filter);
         self
     }
@@ -658,7 +664,7 @@ impl CrossrefRoute for WorksQuery {
 }
 
 impl CrossrefParams for WorksQuery {
-    type Filter = WorkFilter;
+    type Filter = WorksFilter;
 
     fn query_terms(&self) -> &[String] {
         &self.free_form_queries

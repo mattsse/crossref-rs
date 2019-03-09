@@ -1,14 +1,17 @@
 use crate::error::{Error, Result};
 use crate::query::facet::FacetCount;
-use crate::query::funders::Funders;
-use crate::query::journals::Journals;
-use crate::query::members::Members;
-use crate::query::prefixes::Prefixes;
-use crate::query::types::{Type, Types};
-use crate::query::works::{WorkFilter, Works};
+pub use crate::query::funders::{Funders, FundersQuery};
+pub use crate::query::journals::Journals;
+pub use crate::query::members::{Members, MembersQuery};
+pub use crate::query::prefixes::Prefixes;
+pub use crate::query::types::{Type, Types};
+use crate::query::works::{Works, WorksFilter};
+pub use crate::query::works::{WorksCombined, WorksQuery};
 use chrono::NaiveDate;
+use core::fmt::Debug;
 use serde::Serialize;
 use std::borrow::Cow;
+use std::fmt;
 
 /// Helper trait for unified interface
 pub trait CrossrefParams {
@@ -105,11 +108,6 @@ macro_rules! impl_common_query {
                 self.result_control = Some(result_control);
                 self
             }
-
-            //            /// limit the publications that should be returned
-            //            pub fn rows(mut self, usize) -> Self {
-            //                if let Some(ResultControl::)
-            //            }
         }
 
         impl CrossrefParams for $i {
@@ -179,11 +177,6 @@ pub mod prefixes;
 pub mod types;
 /// provides support to query the `/types` route
 pub mod works;
-
-/// reexport queries
-pub use crate::query::funders::FundersQuery;
-pub use crate::query::members::MembersQuery;
-pub use crate::query::works::{WorksCombined, WorksQuery};
 
 /// represents the visibility of an crossref item
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
@@ -400,6 +393,12 @@ impl ResourceComponent {
     }
 }
 
+impl fmt::Display for ResourceComponent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.route().map_err(|_| fmt::Error)?)
+    }
+}
+
 impl CrossrefRoute for ResourceComponent {
     fn route(&self) -> Result<String> {
         match self {
@@ -410,6 +409,12 @@ impl CrossrefRoute for ResourceComponent {
             ResourceComponent::Types(c) => c.route(),
             ResourceComponent::Journals(c) => c.route(),
         }
+    }
+}
+
+impl CrossrefQuery for ResourceComponent {
+    fn resource_component(self) -> ResourceComponent {
+        self
     }
 }
 
@@ -497,7 +502,7 @@ impl<T: CrossrefQueryParam> CrossrefRoute for AsRef<[T]> {
 /// root level trait to construct full crossref api request urls
 pub trait CrossrefQuery: CrossrefRoute {
     /// the resource component endpoint this route targets
-    fn resource_component(&self) -> ResourceComponent;
+    fn resource_component(self) -> ResourceComponent;
 
     /// constructs the full request url by concating the [base_path] with the [route]
     fn to_url(&self, base_path: &str) -> Result<String> {

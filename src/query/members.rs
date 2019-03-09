@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::query::works::{WorkFilter, WorksCombined, WorksQuery};
+use crate::query::works::{WorksCombined, WorksFilter, WorksQuery};
 use crate::query::*;
 use std::borrow::Cow;
 
@@ -91,5 +91,11 @@ impl CrossrefRoute for Members {
                 }
             }
         }
+    }
+}
+
+impl CrossrefQuery for Members {
+    fn resource_component(self) -> ResourceComponent {
+        ResourceComponent::Members(self)
     }
 }

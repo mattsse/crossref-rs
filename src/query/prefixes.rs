@@ -1,6 +1,6 @@
 use crate::error::Result;
-use crate::query::works::{WorkFilter, WorksCombined, WorksQuery};
-use crate::query::{Component, CrossrefRoute};
+use crate::query::works::{WorksCombined, WorksFilter, WorksQuery};
+use crate::query::{Component, CrossrefQuery, CrossrefRoute, ResourceComponent};
 
 /// constructs the request payload for the `/prefixes` route
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,5 +35,11 @@ impl CrossrefRoute for Prefixes {
                 }
             }
         }
+    }
+}
+
+impl CrossrefQuery for Prefixes {
+    fn resource_component(self) -> ResourceComponent {
+        ResourceComponent::Prefixes(self)
     }
 }

@@ -1,7 +1,5 @@
-use crate::error::SerdeErr;
 use crate::query::facet::Facet;
 use crate::query::facet::FacetCount;
-use crate::query::types::CrossRefType;
 use crate::query::Visibility;
 use crate::response::work::*;
 use serde::de::{self, Deserialize, Deserializer};
@@ -12,6 +10,10 @@ use std::fmt;
 
 /// provides the types for a work response
 pub mod work;
+
+/// make `Work` available
+pub use crate::response::work::Work;
+use core::fmt::Pointer;
 
 /// Represents the whole crossref response for a any request.
 #[derive(Debug, Clone, Serialize)]
@@ -83,7 +85,6 @@ impl Response {
         is_member_list -> MemberList,
         is_journal_list -> JournalList,
         is_funder_list -> FunderList,
-        is_prefix_list -> PrefixList,
     );
 
     /// checks whether the `message` holds a variant of `RouteNotFound`
@@ -152,7 +153,6 @@ impl<'de> Deserialize<'de> for Response {
                 MessageType::ValidationFailure => msg_arm!(ValidationFailure, msg),
                 MessageType::WorkAgency => msg_arm!(WorkAgency, msg),
                 MessageType::Prefix => msg_arm!(Prefix, msg),
-                MessageType::PrefixList => msg_arm_list!(PrefixList, msg),
                 MessageType::Type => msg_arm!(Type, msg),
                 MessageType::TypeList => msg_arm_list!(TypeList, msg),
                 MessageType::Work => msg_arm!(Work, msg),
@@ -188,12 +188,10 @@ pub enum ResponseItem {
     WorkAgency(WorkAgency),
     /// metadata data for the DOI owner prefix
     Prefix(Prefix),
-    /// list of prefixes
-    PrefixList(Vec<Prefix>),
     /// a valid work type
-    Type(CrossRefType),
+    Type(CrossrefType),
     /// a list of valid work types
-    TypeList(Vec<CrossRefType>),
+    TypeList(Vec<CrossrefType>),
     /// a publication(journal, articels...)
     Work(Box<Work>),
     /// a list of publications
@@ -210,6 +208,23 @@ pub enum ResponseItem {
     Funder(Box<Funder>),
     /// a list of funder
     FunderList(Vec<Funder>),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[allow(missing_docs)]
+pub struct CrossrefType {
+    pub id: String,
+    /// Name of work's publisher
+    pub label: String,
+}
+
+impl Into<CrossrefType> for crate::query::types::Type {
+    fn into(self) -> CrossrefType {
+        CrossrefType {
+            id: self.id().to_string(),
+            label: self.label().to_string(),
+        }
+    }
 }
 
 /// response item for the `/works/{id}/agency` route
@@ -270,7 +285,6 @@ pub enum MessageType {
     FunderList,
     Type,
     TypeList,
-    PrefixList,
     MemberList,
     Journal,
     JournalList,
@@ -292,12 +306,17 @@ impl MessageType {
             MessageType::FunderList => "funder-list",
             MessageType::Type => "type",
             MessageType::TypeList => "type-list",
-            MessageType::PrefixList => "prefix-list",
             MessageType::Journal => "journal",
             MessageType::JournalList => "journal-list",
             MessageType::ValidationFailure => "validation-failure",
             MessageType::RouteNotFound => "route-not-found",
         }
+    }
+}
+
+impl fmt::Display for MessageType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.as_str().fmt(f)
     }
 }
 

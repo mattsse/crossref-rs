@@ -1,15 +1,7 @@
 use crate::error::{Error, ErrorKind, Result};
-use crate::query::works::{WorkFilter, WorksCombined, WorksQuery};
-use crate::query::{Component, CrossrefRoute};
+use crate::query::works::{WorksCombined, WorksFilter, WorksQuery};
+use crate::query::{Component, CrossrefQuery, CrossrefRoute, ResourceComponent};
 use std::str::FromStr;
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[allow(missing_docs)]
-pub struct CrossRefType {
-    pub id: String,
-    /// Name of work's publisher
-    pub label: String,
-}
 
 /// all possible types of a `Work`
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -156,18 +148,11 @@ impl FromStr for Type {
     }
 }
 
-impl Into<CrossRefType> for Type {
-    fn into(self) -> CrossRefType {
-        CrossRefType {
-            id: self.id().to_string(),
-            label: self.label().to_string(),
-        }
-    }
-}
-
 /// constructs the request payload for the `/types` route
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Types {
+    /// every available type
+    All,
     /// target a specific type at `/types/{id}`
     Identifier(String),
     /// target a `Work` for a specific type at `/types/{id}/works?query..`
@@ -177,6 +162,7 @@ pub enum Types {
 impl CrossrefRoute for Types {
     fn route(&self) -> Result<String> {
         match self {
+            Types::All => Component::Types.route(),
             Types::Identifier(s) => Ok(format!("{}/{}", Component::Types.route()?, s)),
             Types::Works(combined) => {
                 let query = combined.query.route()?;
@@ -198,6 +184,12 @@ impl CrossrefRoute for Types {
                 }
             }
         }
+    }
+}
+
+impl CrossrefQuery for Types {
+    fn resource_component(self) -> ResourceComponent {
+        ResourceComponent::Types(self)
     }
 }
 

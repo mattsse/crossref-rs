@@ -21,49 +21,363 @@ pub use self::error::{Error, Result};
 
 #[doc(inline)]
 pub use self::query::works::{
-    FieldQuery, WorkFilter, WorkResultControl, Works, WorksCombined, WorksQuery,
+    FieldQuery, WorkResultControl, Works, WorksCombined, WorksFilter, WorksQuery,
 };
 #[doc(inline)]
-pub use self::query::{CrossrefRoute, Order, Sort};
+pub use self::query::{CrossrefQuery, CrossrefRoute, Order, Sort};
+
+pub use self::query::{Funders, Journals, Members, Prefixes, Type, Types};
+
+pub use self::response::{CrossrefType, Funder, Journal, Member, Work, WorkAgency};
+
+pub(crate) use self::response::{Message, Response, ResponseItem};
 
 /// A convenience module appropriate for glob imports (`use crossref::prelude::*;`).
 use serde::{Deserialize, Serialize};
 
-// https://github.com/sckott/habanero/blob/master/habanero/crossref/crossref.py
+use crate::error::ErrorKind;
+use crate::query::{FundersQuery, MembersQuery};
+use crate::response::{MessageType, Prefix};
+use reqwest::{self, Client};
+use serde_json::to_string;
 
-// either one general query method and typed query objects or for each target individually
+macro_rules! get_item {
+    ($ident:ident, $value:expr, $got:expr) => {
+        if let Some(msg) = $value {
+            match msg {
+                Message::Single(ResponseItem::$ident(item)) => Ok(item),
+                _ => Err(ErrorKind::UnexpectedItem {
+                    expected: MessageType::$ident,
+                    got: $got,
+                }
+                .into()),
+            }
+        } else {
+            Err(ErrorKind::MissingMessage {
+                expected: MessageType::$ident,
+            }
+            .into())
+        }
+    };
+}
+
+macro_rules! get_item_list {
+    ($ident:ident, $value:expr, $got:expr) => {
+        match $value {
+            Some(Message::List { items, .. }) => {
+                if let ResponseItem::$ident(item) = items {
+                    Ok(item)
+                } else {
+                    Err(ErrorKind::UnexpectedItem {
+                        expected: MessageType::$ident,
+                        got: $got,
+                    }
+                    .into())
+                }
+            }
+            _ => Err(ErrorKind::MissingMessage {
+                expected: MessageType::$ident,
+            }
+            .into()),
+        }
+    };
+}
 
 /// Struct for Crossref search API methods
-#[derive(Debug, Clone, Default)]
-struct Crossref {
-    /// will be included in the `mailto` parameter of the request query
-    /// so that crossref can contact you if your script misbehaves.
-    /// this will get you directed to the "polite pool"
-    pub mailto: Option<String>,
+#[derive(Debug, Clone)]
+pub struct Crossref {
     /// use another base url than `api.crossref.org`
-    pub base_url: Option<String>,
-    /// set an api key if available
-    pub api_key: Option<String>,
+    pub base_url: String,
+    /// the reqwest client that handles the requests
+    pub client: Client,
 }
 
 impl Crossref {
-    /// use HTTP HEAD requests to quickly determine "existence" of a singleton.
-    fn exists() {
-        unimplemented!()
+    const BASE_URL: &'static str = "https://api.crossref.org";
+
+    /// Constructs a new `CrossrefBuilder`.
+    ///
+    /// This is the same as `Crossref::builder()`.
+    pub fn builder() -> CrossrefBuilder {
+        CrossrefBuilder::new()
     }
 
-    /// execute the API call and deserialize the message into T
-    fn fetch_into<'de, T>() -> Result<T>
-    where
-        T: Deserialize<'de>,
-    {
-        unimplemented!()
+    /// Transforms the `CrossrefQuery` in the request route and  executes the request
+    ///
+    /// # Errors
+    ///
+    /// If it was a bad url, the server will return `Resource not found` a `ResourceNotFound` error will be returned in this case
+    /// Also fails if the json response body could be parsed into `Response`
+    /// Fails if there was an error in reqwest executing the request [::reqwest::RequestBuilder::send]
+    fn get_response<T: CrossrefQuery>(&self, query: T) -> Result<Response> {
+        let resp = self
+            .client
+            .get(&query.to_url(&self.base_url)?)
+            .send()?
+            .text()?;
+        if resp.starts_with("Resource not found") {
+            Err(ErrorKind::ResourceNotFound {
+                resource: query.resource_component(),
+            }
+            .into())
+        } else {
+            Ok(serde_json::from_str(&resp)?)
+        }
     }
-    /// execute the API call and deserialize the message into T
-    fn select<'de, T>() -> Result<T>
-    where
-        T: Serialize + Deserialize<'de>,
-    {
-        unimplemented!()
+
+    /// Return the `Work` items that match a certain query.
+    ///
+    /// To search only by query terms use the convenience query method [Crossref::query_works]
+    ///
+    /// # Example
+    ///
+    /// ```edition2018
+    /// use crossref::{Crossref, WorksQuery, WorksFilter};
+    /// # fn run() -> Result<(), crossref::Error> {
+    /// let client = Crossref::builder().build()?;
+    ///
+    /// let query = WorksQuery::new()
+    ///     .query("Machine Learning")
+    ///     .filter(WorksFilter::HasOrcid)
+    ///     .order(crossref::Order::Asc);
+    ///
+    /// let works = client.works(query)?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// # Errors
+    ///
+    /// This method fails if the `works` element expands to a bad route `ResourceNotFound`
+    /// Fails if the response body doesn't have `message` field `MissingMessage`.
+    /// Fails if anything else than a `WorkList` is returned as message `UnexpectedItem`
+    pub fn works(&self, query: WorksQuery) -> Result<Vec<Work>> {
+        let resp = self.get_response(Works::Query(query))?;
+        get_item_list!(WorkList, resp.message, resp.message_type)
+    }
+
+    /// Return the `Work` that is identified by  the `doi`.
+    ///
+    /// # Errors
+    /// This method fails if the doi could not identified `ResourceNotFound`
+    ///
+    pub fn work(&self, doi: &str) -> Result<Work> {
+        let resp = self.get_response(Works::Identifier(doi.to_string()))?;
+        get_item!(Work, resp.message, resp.message_type).map(|x| *x)
+    }
+
+    /// Return the `Agency` that registers the `Work` identified by  the `doi`.
+    ///
+    /// # Errors
+    /// This method fails if the doi could not identified `ResourceNotFound`
+    ///
+    pub fn work_agency(&self, doi: &str) -> Result<WorkAgency> {
+        let resp = self.get_response(Works::Agency(doi.to_string()))?;
+        get_item!(WorkAgency, resp.message, resp.message_type)
+    }
+
+    /// Convenience method to execute [Crossref::works] with a query only consisting of terms.
+    ///
+    /// # Example
+    ///
+    /// ```edition2018
+    /// # fn run() -> Result<(), crossref::Error> {
+    /// let client = crossref::Crossref::builder().build()?;
+    ///
+    /// let works = client.query_works("Machine Learning")?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// This would be the same as
+    ///
+    /// ```edition2018
+    /// use crossref::{Crossref, WorksQuery, WorksFilter};
+    /// # fn run() -> Result<(), crossref::Error> {
+    /// let client = Crossref::builder().build()?;
+    ///
+    /// let works = client.works(WorksQuery::new()
+    ///        .query("Machine Learning"))?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn query_works(&self, term: &str) -> Result<Vec<Work>> {
+        self.works(WorksQuery::new().query(term))
+    }
+
+    /// Return the matching `Funders` items.
+    pub fn funders(&self, funders: FundersQuery) -> Result<Vec<Funder>> {
+        let resp = self.get_response(Funders::Query(funders))?;
+        get_item_list!(FunderList, resp.message, resp.message_type)
+    }
+
+    /// Return the `Funder` for the `id`
+    pub fn funder(&self, id: &str) -> Result<Funder> {
+        let resp = self.get_response(Funders::Identifier(id.to_string()))?;
+        get_item!(Funder, resp.message, resp.message_type).map(|x| *x)
+    }
+
+    /// Return one page of the funder's `Work` that match the query
+    pub fn funder_works(&self, funder_id: &str, term: &str) -> Result<Vec<Work>> {
+        let resp = self.get_response(Funders::Works(WorksCombined::new(
+            funder_id,
+            WorksQuery::new().query(term),
+        )))?;
+        get_item_list!(WorkList, resp.message, resp.message_type)
+    }
+
+    /// Return the matching `Members` items.
+    pub fn members(&self, members: MembersQuery) -> Result<Vec<Member>> {
+        let resp = self.get_response(Members::Query(members))?;
+        get_item_list!(MemberList, resp.message, resp.message_type)
+    }
+
+    /// Return the `Member` for the `id`
+    pub fn member(&self, id: &str) -> Result<Member> {
+        let resp = self.get_response(Members::Identifier(id.to_string()))?;
+        get_item!(Member, resp.message, resp.message_type).map(|x| *x)
+    }
+
+    /// Return one page of the member's `Work` that match the query
+    pub fn member_works(&self, member_id: &str, term: &str) -> Result<Vec<Work>> {
+        let resp = self.get_response(Members::Works(WorksCombined::new(
+            member_id,
+            WorksQuery::new().query(term),
+        )))?;
+        get_item_list!(WorkList, resp.message, resp.message_type)
+    }
+
+    /// Return the `Prefix` for the `id`
+    pub fn prefix(&self, id: &str) -> Result<Prefix> {
+        let resp = self.get_response(Prefixes::Identifier(id.to_string()))?;
+        get_item!(Prefix, resp.message, resp.message_type)
+    }
+
+    /// Return one page of the prefix's `Work` items that match the query
+    pub fn prefix_works(&self, prefix_id: &str, term: &str) -> Result<Vec<Work>> {
+        let resp = self.get_response(Prefixes::Works(WorksCombined::new(
+            prefix_id,
+            WorksQuery::new().query(term),
+        )))?;
+        get_item_list!(WorkList, resp.message, resp.message_type)
+    }
+
+    /// Return all available `Type`
+    pub fn types(&self) -> Result<Vec<CrossrefType>> {
+        let resp = self.get_response(Types::All)?;
+        get_item_list!(TypeList, resp.message, resp.message_type)
+    }
+
+    /// Return the `Type` for the `id`
+    pub fn type_(&self, id: &str) -> Result<CrossrefType> {
+        let resp = self.get_response(Types::Identifier(id.to_string()))?;
+        get_item!(Type, resp.message, resp.message_type)
+    }
+
+    /// Return one page of the types's `Work` items that match the query
+    pub fn type_works(&self, type_: Type, term: &str) -> Result<Vec<Work>> {
+        let resp = self.get_response(Types::Works(WorksCombined::new(
+            type_.id(),
+            WorksQuery::new().query(term),
+        )))?;
+        get_item_list!(WorkList, resp.message, resp.message_type)
+    }
+}
+
+/// A `CrossrefBuilder` can be used to create `Crossref` with additional config.
+///
+/// # Example
+///
+/// ```edition2018
+/// # fn run() -> Result<(), crossref::Error> {
+/// use crossref::Crossref;
+///
+///
+/// let client = Crossref::builder()
+///     .polite("polite@example.com")
+///     .plus_token("your token")
+///     .build()?;
+/// Ok(())
+/// }
+/// ```
+#[derive(Default)]
+pub struct CrossrefBuilder {
+    /// [Good manners = more reliable service.](https://github.com/CrossRef/rest-api-doc#good-manners--more-reliable-service)
+    ///
+    /// will add a `User-Agent` header by default with with the `email` email.
+    /// crossref can contact you if your script misbehaves
+    /// this will get you directed to the "polite pool"
+    user_agent: Option<String>,
+    /// the token for the Crossref Plus service will be included as `Authorization` header
+    /// This token will ensure that said requests get directed to a pool of machines that are reserved for "Plus" SLA users.
+    plus_token: Option<String>,
+    /// use a different base url than `Crossref::BASE_URL` https://api.crossref.org
+    base_url: Option<String>,
+}
+
+impl CrossrefBuilder {
+    /// Constructs a new `CrossrefBuilder`.
+    ///
+    /// This is the same as `Crossref::builder()`.
+    pub fn new() -> CrossrefBuilder {
+        CrossrefBuilder::default()
+    }
+
+    /// be polite and set your email as `User-Agent`
+    /// will get you in the polite pool of crossref
+    pub fn polite(mut self, email: &str) -> Self {
+        self.user_agent = Some(format!("mailto:{}", email));
+        self
+    }
+
+    /// set the user agent directly
+    pub fn user_agent(mut self, user_agent: &str) -> Self {
+        self.user_agent = Some(user_agent.to_string());
+        self
+    }
+
+    /// set a crossref plus service  API token
+    pub fn plus_token(mut self, token: &str) -> Self {
+        self.plus_token = Some(token.to_string());
+        self
+    }
+
+    /// Returns a `Crossref` that uses this `CrossrefBuilder` configuration.
+    /// # Errors
+    ///
+    /// This will fail if TLS backend cannot be initialized see [reqwest::ClientBuilder::build]
+    pub fn build(self) -> Result<Crossref> {
+        use reqwest::header;
+        let mut headers = header::HeaderMap::new();
+        if let Some(agent) = &self.user_agent {
+            headers.insert(
+                header::USER_AGENT,
+                header::HeaderValue::from_str(agent).map_err(|_| ErrorKind::Config {
+                    msg: format!("failed to create User Agent header for `{}`", agent),
+                })?,
+            );
+        }
+        if let Some(token) = &self.plus_token {
+            headers.insert(
+                header::AUTHORIZATION,
+                header::HeaderValue::from_str(token).map_err(|_| ErrorKind::Config {
+                    msg: format!("failed to create AUTHORIZATION header for `{}`", token),
+                })?,
+            );
+        }
+        let client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .map_err(|_| ErrorKind::Config {
+                msg: "failed to initialize TLS backend".to_string(),
+            })?;
+
+        Ok(Crossref {
+            base_url: self
+                .base_url
+                .unwrap_or_else(|| Crossref::BASE_URL.to_string()),
+            client,
+        })
     }
 }

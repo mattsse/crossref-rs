@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::query::facet::FacetCount;
-use crate::query::works::{WorkFilter, WorksCombined, WorksQuery};
+use crate::query::works::{WorksCombined, WorksFilter, WorksQuery};
 use crate::query::*;
 use std::borrow::Cow;
 
@@ -79,5 +79,11 @@ impl CrossrefRoute for Funders {
                 }
             }
         }
+    }
+}
+
+impl CrossrefQuery for Funders {
+    fn resource_component(self) -> ResourceComponent {
+        ResourceComponent::Funders(self)
     }
 }
