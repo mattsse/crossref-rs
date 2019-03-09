@@ -11,8 +11,7 @@ use std::fmt;
 /// provides the types for a work response
 pub mod work;
 
-/// make `Work` available
-pub use crate::response::work::Work;
+pub use crate::response::work::{Work, WorkList};
 use core::fmt::Pointer;
 
 /// Represents the whole crossref response for a any request.
@@ -116,6 +115,7 @@ impl<'de> Deserialize<'de> for Response {
         struct ListResp {
             #[serde(default)]
             facets: FacetMap,
+            next_cursor: Option<String>,
             total_results: usize,
             items_per_page: Option<usize>,
             query: Option<QueryResponse>,
@@ -148,6 +148,22 @@ impl<'de> Deserialize<'de> for Response {
             }};
         }
 
+        fn work_list(msg: Value) -> Result<Message, serde_json::Error> {
+            let list_resp: ListResp = ::serde_json::from_value(msg)?;
+            let works: Vec<Work> = ::serde_json::from_value(list_resp.items)?;
+
+            Ok(Message::List {
+                facets: list_resp.facets,
+                total_results: list_resp.total_results,
+                items_per_page: list_resp.items_per_page,
+                query: list_resp.query,
+                items: ResponseItem::WorkList(WorkList {
+                    works,
+                    next_cursor: list_resp.next_cursor,
+                }),
+            })
+        }
+
         let message = match fragment.message {
             Some(msg) => Some(match &fragment.message_type {
                 MessageType::ValidationFailure => msg_arm!(ValidationFailure, msg),
@@ -156,7 +172,7 @@ impl<'de> Deserialize<'de> for Response {
                 MessageType::Type => msg_arm!(Type, msg),
                 MessageType::TypeList => msg_arm_list!(TypeList, msg),
                 MessageType::Work => msg_arm!(Work, msg),
-                MessageType::WorkList => msg_arm_list!(WorkList, msg),
+                MessageType::WorkList => work_list(msg).map_err(de::Error::custom)?,
                 MessageType::Member => msg_arm!(Member, msg),
                 MessageType::MemberList => msg_arm_list!(MemberList, msg),
                 MessageType::Journal => msg_arm!(Journal, msg),
@@ -195,7 +211,7 @@ pub enum ResponseItem {
     /// a publication(journal, articels...)
     Work(Box<Work>),
     /// a list of publications
-    WorkList(Vec<Work>),
+    WorkList(WorkList),
     /// a crossref member (mostly publishers)
     Member(Box<Member>),
     /// a list of crossref members

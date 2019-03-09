@@ -28,7 +28,7 @@ pub use self::query::{CrossrefQuery, CrossrefRoute, Order, Sort};
 
 pub use self::query::{Funders, Journals, Members, Prefixes, Type, Types};
 
-pub use self::response::{CrossrefType, Funder, Journal, Member, Work, WorkAgency};
+pub use self::response::{CrossrefType, Funder, Journal, Member, Work, WorkAgency, WorkList};
 
 pub(crate) use self::response::{Message, Response, ResponseItem};
 
@@ -151,8 +151,9 @@ impl Crossref {
     /// This method fails if the `works` element expands to a bad route `ResourceNotFound`
     /// Fails if the response body doesn't have `message` field `MissingMessage`.
     /// Fails if anything else than a `WorkList` is returned as message `UnexpectedItem`
-    pub fn works(&self, query: WorksQuery) -> Result<Vec<Work>> {
+    pub fn works(&self, query: WorksQuery) -> Result<WorkList> {
         let resp = self.get_response(Works::Query(query))?;
+        // TODO add deep paging support
         get_item_list!(WorkList, resp.message, resp.message_type)
     }
 
@@ -202,7 +203,7 @@ impl Crossref {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn query_works(&self, term: &str) -> Result<Vec<Work>> {
+    pub fn query_works(&self, term: &str) -> Result<WorkList> {
         self.works(WorksQuery::new().query(term))
     }
 
@@ -219,7 +220,7 @@ impl Crossref {
     }
 
     /// Return one page of the funder's `Work` that match the query
-    pub fn funder_works(&self, funder_id: &str, term: &str) -> Result<Vec<Work>> {
+    pub fn funder_works(&self, funder_id: &str, term: &str) -> Result<WorkList> {
         let resp = self.get_response(Funders::Works(WorksCombined::new(
             funder_id,
             WorksQuery::new().query(term),
@@ -240,7 +241,7 @@ impl Crossref {
     }
 
     /// Return one page of the member's `Work` that match the query
-    pub fn member_works(&self, member_id: &str, term: &str) -> Result<Vec<Work>> {
+    pub fn member_works(&self, member_id: &str, term: &str) -> Result<WorkList> {
         let resp = self.get_response(Members::Works(WorksCombined::new(
             member_id,
             WorksQuery::new().query(term),
@@ -255,7 +256,7 @@ impl Crossref {
     }
 
     /// Return one page of the prefix's `Work` items that match the query
-    pub fn prefix_works(&self, prefix_id: &str, term: &str) -> Result<Vec<Work>> {
+    pub fn prefix_works(&self, prefix_id: &str, term: &str) -> Result<WorkList> {
         let resp = self.get_response(Prefixes::Works(WorksCombined::new(
             prefix_id,
             WorksQuery::new().query(term),
@@ -276,7 +277,7 @@ impl Crossref {
     }
 
     /// Return one page of the types's `Work` items that match the query
-    pub fn type_works(&self, type_: Type, term: &str) -> Result<Vec<Work>> {
+    pub fn type_works(&self, type_: Type, term: &str) -> Result<WorkList> {
         let resp = self.get_response(Types::Works(WorksCombined::new(
             type_.id(),
             WorksQuery::new().query(term),

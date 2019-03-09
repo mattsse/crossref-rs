@@ -5,41 +5,14 @@ use chrono::NaiveDate;
 /// A hashmap containing relation name, Relation pairs.
 pub type Relations = std::collections::HashMap<String, Relation>;
 
-/// Helper struct to represent dates in the cross ref api as nested arrays of numbers
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct DateParts(pub Vec<Vec<Option<u32>>>);
-
-impl DateParts {
-    /// converts the nested array of numbers into the corresponding [DateField]
-    /// standalone years are allowed.
-    /// if an array is empty, [None] will be returned
-    pub fn as_date(&self) -> Option<DateField> {
-        /// converts an array of numbers into chrono [NaiveDate] if it contains at least a single value
-        fn naive(v: &[Option<u32>]) -> Option<NaiveDate> {
-            match v.len() {
-                0 => None,
-                1 => Some(NaiveDate::from_ymd(v[0]? as i32, 0, 0)),
-                2 => Some(NaiveDate::from_ymd(v[0]? as i32, v[1]?, 0)),
-                3 => Some(NaiveDate::from_ymd(v[0]? as i32, v[1]?, v[2]?)),
-                _ => None,
-            }
-        }
-
-        match self.0.len() {
-            0 => None,
-            1 => Some(DateField::Single(naive(&self.0[0])?)),
-            2 => Some(DateField::Range {
-                from: naive(&self.0[0])?,
-                to: naive(&self.0[1])?,
-            }),
-            _ => Some(DateField::Multi(
-                self.0
-                    .iter()
-                    .map(|x| naive(x))
-                    .collect::<Option<Vec<_>>>()?,
-            )),
-        }
-    }
+#[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
+pub struct WorkList {
+    /// all work items that are returned
+    pub works: Vec<Work>,
+    /// deep page through `/works` result sets
+    pub next_cursor: Option<String>,
 }
 
 /// the main return type of the crossref api
@@ -69,7 +42,6 @@ pub struct Work {
     pub is_referenced_by_count: i32,
     /// Currently always `Crossref`
     pub source: String,
-
     pub journal_issue: Option<Issue>,
     /// DOI prefix identifier of the form `http://id.crossref.org/prefix/DOI_PREFIX`
     pub prefix: String,
@@ -154,6 +126,43 @@ pub struct Work {
     pub relation: Option<Relations>,
     /// Peer review metadata
     pub review: Option<Relations>,
+}
+
+/// Helper struct to represent dates in the cross ref api as nested arrays of numbers
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct DateParts(pub Vec<Vec<Option<u32>>>);
+
+impl DateParts {
+    /// converts the nested array of numbers into the corresponding [DateField]
+    /// standalone years are allowed.
+    /// if an array is empty, [None] will be returned
+    pub fn as_date(&self) -> Option<DateField> {
+        /// converts an array of numbers into chrono [NaiveDate] if it contains at least a single value
+        fn naive(v: &[Option<u32>]) -> Option<NaiveDate> {
+            match v.len() {
+                0 => None,
+                1 => Some(NaiveDate::from_ymd(v[0]? as i32, 0, 0)),
+                2 => Some(NaiveDate::from_ymd(v[0]? as i32, v[1]?, 0)),
+                3 => Some(NaiveDate::from_ymd(v[0]? as i32, v[1]?, v[2]?)),
+                _ => None,
+            }
+        }
+
+        match self.0.len() {
+            0 => None,
+            1 => Some(DateField::Single(naive(&self.0[0])?)),
+            2 => Some(DateField::Range {
+                from: naive(&self.0[0])?,
+                to: naive(&self.0[1])?,
+            }),
+            _ => Some(DateField::Multi(
+                self.0
+                    .iter()
+                    .map(|x| naive(x))
+                    .collect::<Option<Vec<_>>>()?,
+            )),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
