@@ -1,16 +1,18 @@
-//#![deny(warnings)]
-//#![deny(missing_docs)]
+//! This crate provides a client for interacting with the crossref-api
+//!
+#![deny(warnings)]
+#![deny(missing_docs)]
 #![allow(unused)]
 #[macro_use]
 extern crate serde_derive;
 
-use crate::model::ResourceLink;
-
 mod error;
-pub mod model;
-pub mod proto;
+/// provides types to construct a specific query
 pub mod query;
+/// provides the response types of the crossref api
+pub mod response;
 
+/// an async client
 #[cfg(feature = "client")]
 pub mod client;
 

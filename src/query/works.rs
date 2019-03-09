@@ -1,6 +1,4 @@
 use crate::error::{Error, Result};
-use crate::model::*;
-use crate::proto::MessageType::WorkList;
 use crate::query::facet::FacetCount;
 use crate::query::types::Type;
 use crate::query::*;
@@ -159,6 +157,7 @@ pub enum WorkFilter {
 }
 
 impl WorkFilter {
+    /// the identifier for a the query key
     pub fn name(&self) -> &str {
         match self {
             WorkFilter::HasFunder => "has-funder",
@@ -378,6 +377,7 @@ impl CrossrefQueryParam for FieldQuery {
     }
 }
 
+/// limits from where and how many `Work` items should be returned
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WorkResultControl {
     /// use the standard ResultControl available for all components

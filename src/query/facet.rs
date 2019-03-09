@@ -1,6 +1,7 @@
 use crate::query::{CrossrefQueryParam, ParamFragment};
 use std::borrow::Cow;
 
+/// all available facets that can be set as filter in a query
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Facet {
@@ -51,6 +52,7 @@ impl Facet {
         }
     }
 
+    /// the key name for the query fragment
     fn as_str(&self) -> &str {
         match self {
             Facet::Affiliation => "affiliation",
@@ -75,6 +77,7 @@ impl Facet {
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
 pub struct FacetCount {
     /// the targeted facet
     pub facet: Facet,

@@ -1,15 +1,17 @@
 use crate::error::SerdeErr;
-use crate::model::Work;
-use crate::model::*;
 use crate::query::facet::Facet;
 use crate::query::facet::FacetCount;
 use crate::query::types::CrossRefType;
 use crate::query::Visibility;
+use crate::response::work::*;
 use serde::de::{self, Deserialize, Deserializer};
 
 use serde_json::{from_value, Value};
 use std::collections::HashMap;
 use std::fmt;
+
+/// provides the types for a work response
+pub mod work;
 
 /// Represents the whole crossref response for a any request.
 #[derive(Debug, Clone, Serialize)]
@@ -26,13 +28,16 @@ pub struct Response {
     pub message: Option<Message>,
 }
 
+/// at some routes the `msg_version` is missing, this returns the default version for a crossref response
 fn default_msg_version() -> String {
     "1.0.0".to_string()
 }
 
+/// this macro helps to generate a function that checks whether the message is of a specific type
 macro_rules! impl_msg_helper {
     (single: $($name:ident -> $ident:ident,)*) => {
     $(
+        /// checks if the message holds the variant
         pub fn $name(&self) -> bool {
            if let Some(Message::Single(ResponseItem::$ident(_))) = &self.message {
                true
@@ -44,6 +49,7 @@ macro_rules! impl_msg_helper {
     };
     (list: $($name:ident -> $ident:ident,)*) => {
     $(
+        /// checks if the message holds the variant
         pub fn $name(&self) -> bool {
             match &self.message {
                 Some(Message::List{items, ..}) => {
@@ -77,8 +83,10 @@ impl Response {
         is_member_list -> MemberList,
         is_journal_list -> JournalList,
         is_funder_list -> FunderList,
+        is_prefix_list -> PrefixList,
     );
 
+    /// checks whether the `message` holds a variant of `RouteNotFound`
     pub fn is_route_not_found(&self) -> bool {
         match &self.message {
             Some(Message::Single(ResponseItem::RouteNotFound)) => true,
@@ -144,6 +152,7 @@ impl<'de> Deserialize<'de> for Response {
                 MessageType::ValidationFailure => msg_arm!(ValidationFailure, msg),
                 MessageType::WorkAgency => msg_arm!(WorkAgency, msg),
                 MessageType::Prefix => msg_arm!(Prefix, msg),
+                MessageType::PrefixList => msg_arm_list!(PrefixList, msg),
                 MessageType::Type => msg_arm!(Type, msg),
                 MessageType::TypeList => msg_arm_list!(TypeList, msg),
                 MessageType::Work => msg_arm!(Work, msg),
@@ -171,32 +180,51 @@ impl<'de> Deserialize<'de> for Response {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ResponseItem {
+    /// if a request failed on the server side
     ValidationFailure(Vec<Failure>),
+    /// a route could not be found on the server side
     RouteNotFound,
+    /// the agency for a specific work
     WorkAgency(WorkAgency),
+    /// metadata data for the DOI owner prefix
     Prefix(Prefix),
+    /// list of prefixes
+    PrefixList(Vec<Prefix>),
+    /// a valid work type
     Type(CrossRefType),
+    /// a list of valid work types
     TypeList(Vec<CrossRefType>),
+    /// a publication(journal, articels...)
     Work(Box<Work>),
+    /// a list of publications
     WorkList(Vec<Work>),
+    /// a crossref member (mostly publishers)
     Member(Box<Member>),
+    /// a list of crossref members
     MemberList(Vec<Member>),
+    /// a Journal publication
     Journal(Box<Journal>),
+    /// list of journal publications
     JournalList(Vec<Journal>),
+    /// a funder in the [funder registry](https://github.com/Crossref/open-funder-registry)
     Funder(Box<Funder>),
+    /// a list of funder
     FunderList(Vec<Funder>),
 }
 
 /// response item for the `/works/{id}/agency` route
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WorkAgency {
+    /// the DOI fo the work that belongs to the `agency`
     #[serde(rename = "DOI")]
     doi: String,
+    /// the agency that owns the work with `doi`
     agency: Agency,
 }
 
 /// response item for the `/prefix/{id}/` route
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[allow(missing_docs)]
 pub struct Prefix {
     pub member: String,
     pub name: String,
@@ -211,13 +239,19 @@ pub enum Message {
     /// (e.g. DOI, ISSN, funder_identifier) typically returns in a singleton result.
     Single(ResponseItem),
 
+    /// a response message that holds a list of items and metadata
     #[serde(rename_all = "kebab-case")]
     List {
+        /// if facets where part in the request they are also included in the response
         #[serde(default)]
         facets: FacetMap,
+        /// the number of items that match the response
         total_results: usize,
+        /// crossref responses for large number of items are divided in pages, number of elements to expect in `items`
         items_per_page: Option<usize>,
+        /// if a query was set in the request, this will also be part in the response
         query: Option<QueryResponse>,
+        /// a list of items, can only be one of the `List` of `ResponseItem`
         items: ResponseItem,
     },
 }
@@ -225,6 +259,7 @@ pub enum Message {
 /// all possible `message-type` of a response
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
 pub enum MessageType {
     WorkAgency,
     Funder,
@@ -244,6 +279,7 @@ pub enum MessageType {
 }
 
 impl MessageType {
+    /// the type identifier for a message
     pub fn as_str(&self) -> &str {
         match self {
             MessageType::WorkAgency => "work-agency",
@@ -265,6 +301,16 @@ impl MessageType {
     }
 }
 
+/// if a query was set in the request then it is also part of the result
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct QueryResponse {
+    /// from which the returned items start
+    pub start_index: usize,
+    /// the terms that were initially set in the request query
+    pub search_terms: Option<String>,
+}
+
 /// facets are returned as map
 pub type FacetMap = HashMap<String, FacetItem>;
 
@@ -282,15 +328,19 @@ pub struct FacetItem {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Failure {
+    /// identifier for a failue like `parameter-not-found`
     #[serde(rename = "type")]
     type_: String,
+    /// value that caused the failure
     value: String,
+    /// the message from the server
     message: String,
 }
 
 /// response item for the `/funder/{id}` route
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
+#[allow(missing_docs)]
 pub struct Funder {
     pub hierarchy_names: HashMap<String, Option<String>>,
     pub hierarchy: HashMap<String, HashMap<String, HashMap<String, bool>>>,
@@ -310,6 +360,7 @@ pub struct Funder {
 /// response item for the `/member/{id}` route
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
+#[allow(missing_docs)]
 pub struct Member {
     pub primary_name: String,
     pub last_status_check_time: usize,
@@ -329,6 +380,7 @@ pub struct Member {
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
+#[allow(missing_docs)]
 pub struct Counts {
     pub total_dois: usize,
     pub current_dois: usize,
@@ -337,12 +389,14 @@ pub struct Counts {
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
+#[allow(missing_docs)]
 pub struct Breakdowns {
     pub dois_by_issued_year: Vec<Vec<u32>>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
+#[allow(missing_docs)]
 pub struct Coverage {
     pub affiliations_current: f32,
     pub similarity_checking_current: f32,
@@ -370,6 +424,7 @@ pub struct Coverage {
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
+#[allow(missing_docs)]
 pub struct RefPrefix {
     pub value: String,
     pub name: String,
@@ -380,6 +435,7 @@ pub struct RefPrefix {
 /// response item for the `/journal/{id}` route
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
 pub struct Journal {
     /// could not determine type, possible PartialDateParts
     pub last_status_check_time: Option<Value>,

@@ -4,16 +4,18 @@ use crate::query::{Component, CrossrefRoute};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[allow(missing_docs)]
 pub struct CrossRefType {
-    /// Name of work's publisher
     pub id: String,
     /// Name of work's publisher
     pub label: String,
 }
 
+/// all possible types of a `Work`
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(tag = "id")]
 #[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
 pub enum Type {
     BookSection,
     Monograph,
@@ -163,9 +165,12 @@ impl Into<CrossRefType> for Type {
     }
 }
 
+/// constructs the request payload for the `/types` route
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Types {
+    /// target a specific type at `/types/{id}`
     Identifier(String),
+    /// target a `Work` for a specific type at `/types/{id}/works?query..`
     Works(WorksCombined),
 }
 

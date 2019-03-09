@@ -48,6 +48,7 @@ impl DateParts {
 /// with minor adjustments
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
 pub struct Work {
     /// Name of work's publisher
     pub publisher: String,
@@ -156,6 +157,7 @@ pub struct Work {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[allow(missing_docs)]
 pub struct FundingBody {
     /// Funding body primary name
     pub name: String,
@@ -170,6 +172,7 @@ pub struct FundingBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[allow(missing_docs)]
 pub struct ClinicalTrialNumber {
     /// Identifier of the clinical trial
     #[serde(rename = "clinical-trial-number")]
@@ -182,6 +185,7 @@ pub struct ClinicalTrialNumber {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[allow(missing_docs)]
 pub struct Contributor {
     pub family: String,
     pub given: Option<String>,
@@ -195,6 +199,7 @@ pub struct Contributor {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[allow(missing_docs)]
 pub struct Affiliation {
     /// the affiliation's name
     pub name: String,
@@ -244,11 +249,17 @@ pub enum DateField {
     /// only a single date vector
     Single(NaiveDate),
     /// two date vectors represent a range
-    Range { from: NaiveDate, to: NaiveDate },
+    Range {
+        /// start date of the range
+        from: NaiveDate,
+        /// end date of the range
+        to: NaiveDate,
+    },
     /// more than two date vectors are present
     Multi(Vec<NaiveDate>),
 }
 
+/// metadata about when the `Work` entry was updated
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Update {
     /// Date on which the update was published
@@ -264,6 +275,7 @@ pub struct Update {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[allow(missing_docs)]
 pub struct Assertion {
     pub name: String,
     pub value: String,
@@ -277,6 +289,7 @@ pub struct Assertion {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
 pub struct Issue {
     /// Date on which the work was published in print
     pub published_print: Option<PartialDate>,
@@ -287,17 +300,20 @@ pub struct Issue {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[allow(missing_docs)]
 pub struct AssertionGroup {
     pub name: String,
     pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[allow(missing_docs)]
 pub struct Agency {
     pub id: String,
     pub label: Option<String>,
 }
 
+/// how the `Work` is licensed
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct License {
@@ -312,6 +328,7 @@ pub struct License {
     pub url: String,
 }
 
+/// metadata about a related resource
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ResourceLink {
@@ -328,6 +345,7 @@ pub struct ResourceLink {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
 pub struct Reference {
     pub key: String,
     #[serde(rename = "DOI")]
@@ -357,9 +375,11 @@ pub struct Reference {
     pub isbn_type: Option<String>,
 }
 
+/// ISSN info for the `Work`
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ISSN {
+    /// identifier
     pub value: String,
     /// One of `eissn`, `pissn` or `lissn`
     #[serde(rename = "type")]
@@ -368,6 +388,7 @@ pub struct ISSN {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
 pub struct ContentDomain {
     pub domain: Vec<String>,
     pub crossmark_restriction: bool,
@@ -375,6 +396,7 @@ pub struct ContentDomain {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
 pub struct Relation {
     pub id_type: Option<String>,
     pub id: Option<String>,
@@ -383,6 +405,7 @@ pub struct Relation {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
 pub struct Review {
     pub running_number: Option<String>,
     pub revision_round: Option<String>,
@@ -397,12 +420,6 @@ pub struct Review {
     pub language: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct QueryResponse {
-    pub start_index: usize,
-    pub search_terms: Option<String>,
-}
 #[cfg(test)]
 mod tests {
     use super::*;

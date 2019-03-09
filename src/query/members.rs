@@ -18,6 +18,7 @@ pub enum MembersFilter {
 }
 
 impl MembersFilter {
+    /// the key name for the filter element
     pub fn name(&self) -> &str {
         match self {
             MembersFilter::HasPublicReferences => "has-public-references",
@@ -47,10 +48,14 @@ impl Filter for MembersFilter {}
 
 impl_common_query!(MembersQuery, MembersFilter);
 
+/// constructs the request payload for the `/members` route
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Members {
+    /// target a specific member at `/members/{id}`
     Identifier(String),
+    /// target all members that match the query at `/members?query...`
     Query(MembersQuery),
+    /// target a `Work` for a specific funder at `/members/{id}/works?query..`
     Works(WorksCombined),
 }
 

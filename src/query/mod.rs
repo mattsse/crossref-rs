@@ -1,9 +1,8 @@
 use crate::error::{Error, Result};
-use crate::model::*;
 use crate::query::facet::FacetCount;
 use crate::query::funders::Funders;
 use crate::query::journals::Journals;
-use crate::query::member::Members;
+use crate::query::members::Members;
 use crate::query::prefixes::Prefixes;
 use crate::query::types::{Type, Types};
 use crate::query::works::{WorkFilter, Works};
@@ -166,27 +165,30 @@ macro_rules! impl_common_query {
     };
 }
 
+/// provides types to filter facets
 pub mod facet;
+/// provides support to query the `/funders` route
 pub mod funders;
+/// provides support to query the `/funders` route
 pub mod journals;
-pub mod member;
+/// provides support to query the `/journals` route
+pub mod members;
+/// provides support to query the `/members` route
 pub mod prefixes;
+/// provides support to query the `/prefixes` route
 pub mod types;
+/// provides support to query the `/types` route
 pub mod works;
-
-pub mod filter {
-    pub use super::member::MembersFilter;
-    pub use super::works::WorkFilter;
-}
 
 /// reexport queries
 pub use crate::query::funders::FundersQuery;
-pub use crate::query::member::MembersQuery;
+pub use crate::query::members::MembersQuery;
 pub use crate::query::works::{WorksCombined, WorksQuery};
 
 /// represents the visibility of an crossref item
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[allow(missing_docs)]
 pub enum Visibility {
     Open,
     Limited,
@@ -194,6 +196,7 @@ pub enum Visibility {
 }
 
 impl Visibility {
+    /// str identifier
     pub fn as_str(&self) -> &str {
         match self {
             Visibility::Open => "open",
@@ -213,6 +216,7 @@ pub enum Order {
 }
 
 impl Order {
+    /// the key name for the order parameter
     pub fn as_str(&self) -> &str {
         match self {
             Order::Asc => "asc",
@@ -257,6 +261,7 @@ pub enum Sort {
 }
 
 impl Sort {
+    /// the key name for the filter element
     pub fn as_str(&self) -> &str {
         match self {
             Sort::Score => "score",
@@ -292,7 +297,12 @@ pub enum ResultControl {
     /// high offsets (~10k) result in long response times
     Offset(usize),
     /// combines rows and offset: limit returned items per page, starting at the offset
-    RowsOffset { rows: usize, offset: usize },
+    RowsOffset {
+        /// row limit
+        rows: usize,
+        /// where to start
+        offset: usize,
+    },
     /// return random results
     Sample(usize),
 }
@@ -338,6 +348,7 @@ pub enum Component {
 }
 
 impl Component {
+    /// identifier for the component route
     pub fn as_str(&self) -> &str {
         match self {
             Component::Works => "works",
@@ -376,6 +387,7 @@ pub enum ResourceComponent {
 }
 
 impl ResourceComponent {
+    /// the starting crossref component that in the route `/{primary_component}/{id}/works`
     pub fn primary_component(&self) -> Component {
         match self {
             ResourceComponent::Works(_) => Component::Works,

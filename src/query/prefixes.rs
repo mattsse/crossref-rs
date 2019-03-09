@@ -2,9 +2,12 @@ use crate::error::Result;
 use crate::query::works::{WorkFilter, WorksCombined, WorksQuery};
 use crate::query::{Component, CrossrefRoute};
 
+/// constructs the request payload for the `/prefixes` route
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Prefixes {
+    /// target a specific member at `/prefixes/{id}`
     Identifier(String),
+    /// target a `Work` for a specific prefix at `/prefixes/{id}/works?query..`
     Works(WorksCombined),
 }
 

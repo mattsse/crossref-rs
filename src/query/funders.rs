@@ -12,6 +12,7 @@ pub enum FundersFilter {
 }
 
 impl FundersFilter {
+    /// the key name for the filter element
     pub fn name(&self) -> &str {
         match self {
             FundersFilter::Location(_) => "location",
@@ -35,10 +36,14 @@ impl Filter for FundersFilter {}
 
 impl_common_query!(FundersQuery, FundersFilter);
 
+/// constructs the request payload for the `/funders` route
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Funders {
+    /// target a specific funder at `/funder/{id}`
     Identifier(String),
+    /// target all funders that match the query at `/funders?query...`
     Query(FundersQuery),
+    /// target a `Work` for a specific funder at `/funders/{id}/works?query..`
     Works(WorksCombined),
 }
 

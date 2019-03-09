@@ -27,17 +27,22 @@ impl fmt::Display for Error {
     }
 }
 
+/// all different error types this crate uses
 #[derive(Debug, Clone, Fail, PartialEq)]
 pub enum ErrorKind {
+    /// if an invalid type was requested
     #[fail(display = "invalid type name: {}", name)]
     InvalidTypeName { name: String },
 
+    /// if a error in serde occurred
     #[fail(display = "invalid serde: {}", msg)]
     InvalidSerde { msg: String },
 }
 
+/// helper to make `Error` usable in serde
 #[derive(Debug)]
 pub struct SerdeErr {
+    /// wrapped error
     pub error: Error,
 }
 
