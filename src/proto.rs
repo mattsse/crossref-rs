@@ -1,11 +1,15 @@
+use crate::error::SerdeErr;
 use crate::model::Work;
 use crate::model::*;
 use crate::query::facet::Facet;
 use crate::query::facet::FacetCount;
 use crate::query::types::CrossRefType;
 use crate::query::Visibility;
-use serde_json::Value;
+use serde::de::{self, Deserialize, Deserializer};
+
+use serde_json::{from_value, Value};
 use std::collections::HashMap;
+use std::fmt;
 
 /// Represents the crossref response for a `work` request.
 /// requesting an url: `https://api.crossref.org/works/10.1037/0003-066X.59.1.29/agency`
@@ -22,7 +26,7 @@ use std::collections::HashMap;
 ///    }
 ///  }#"
 ///
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct CrossrefResponse {
     /// the status of the request
@@ -30,47 +34,201 @@ pub struct CrossrefResponse {
     /// the type of the response message holds
     pub message_type: MessageType,
     /// the version of the service created this message
+    #[serde(default = "default_msg_version")]
     pub message_version: String,
     /// the actual message of the response
-    pub message: Option<Msg>,
+    pub message: Option<Message>,
+}
 
-    /// the number of elements to expect
-    pub items_per_page: usize,
+fn default_msg_version() -> String{"1.0.0".to_string()}
 
-    /// information about the submitted query
-    pub query: Option<QueryResponse>,
+macro_rules! impl_msg_helper {
+    (single: $($name:ident -> $ident:ident,)*) => {
+    $(
+        pub fn $name(&self) -> bool {
+           if let Some(Message::Single(ResponseMessage::$ident(_))) = &self.message {
+               true
+           } else {
+               false
+           }
+        }
+    )+
+    };
+    (list: $($name:ident -> $ident:ident,)*) => {
+    $(
+        pub fn $name(&self) -> bool {
+            match &self.message {
+                Some(Message::List{items, ..}) => {
+                    if let ResponseMessage::$ident(_) = items {
+                        true
+                    } else {
+                        false
+                    }
+                },
+                _ => false
+           }
+        }
+    )+
+    };
+}
+
+impl CrossrefResponse {
+    impl_msg_helper!(single:
+        is_work_ageny -> WorkAgency,
+        is_funder -> Funder,
+        is_prefix -> Prefix,
+        is_work -> Work,
+        is_type -> Type,
+        is_journal -> Journal,
+        is_member -> Member,
+        is_validation_failure -> ValidationFailure,
+    );
+    impl_msg_helper!(list:
+        is_type_list -> TypeList,
+        is_work_list -> WorkList,
+        is_member_list -> MemberList,
+        is_journal_list -> JournalList,
+        is_funder_list -> FunderList,
+    );
+
+    pub fn is_route_not_found(&self) -> bool {
+        match &self.message {
+            Some(Message::Single(ResponseMessage::RouteNotFound)) => true,
+            _ => false,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for CrossrefResponse {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "kebab-case")]
+        struct ResponseFragment {
+            status: String,
+            message_type: MessageType,
+            #[serde(default = "default_msg_version")]
+            message_version: String,
+            message: Option<Value>,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "kebab-case")]
+        struct ListResp {
+            #[serde(default)]
+            facets: FacetMap,
+            total_results: usize,
+            items_per_page: Option<usize>,
+            query: Option<QueryResponse>,
+            items: Value,
+        }
+
+        let fragment = ResponseFragment::deserialize(deserializer).unwrap();
+
+        macro_rules! msg_arm {
+            ($ident:ident, $value:expr) => {{
+                Message::Single(ResponseMessage::$ident(
+                    ::serde_json::from_value($value).map_err(de::Error::custom)?,
+                ))
+            }};
+        }
+        macro_rules! msg_arm_list {
+            ($ident:ident, $value:expr) => {{
+                let list_resp: ListResp =
+                    ::serde_json::from_value($value).map_err(de::Error::custom)?;
+                let items = ResponseMessage::$ident(
+                    ::serde_json::from_value(list_resp.items).map_err(de::Error::custom)?,
+                );
+                Message::List {
+                    facets: list_resp.facets,
+                    total_results: list_resp.total_results,
+                    items_per_page: list_resp.items_per_page,
+                    query: list_resp.query,
+                    items,
+                }
+            }};
+        }
+
+        let message = match fragment.message {
+            Some(msg) => Some(match &fragment.message_type {
+                MessageType::ValidationFailure => msg_arm!(ValidationFailure, msg),
+                MessageType::WorkAgency => msg_arm!(WorkAgency, msg),
+                MessageType::Prefix => msg_arm!(Prefix, msg),
+                MessageType::Type => msg_arm!(Type, msg),
+                MessageType::TypeList => msg_arm_list!(TypeList, msg),
+                MessageType::Work => msg_arm!(Work, msg),
+                MessageType::WorkList => msg_arm_list!(WorkList, msg),
+                MessageType::Member => msg_arm!(Member, msg),
+                MessageType::MemberList => msg_arm_list!(MemberList, msg),
+                MessageType::Journal => msg_arm!(Journal, msg),
+                MessageType::JournalList => msg_arm_list!(JournalList, msg),
+                MessageType::Funder => msg_arm!(Funder, msg),
+                MessageType::FunderList => msg_arm_list!(FunderList, msg),
+                _ => unreachable!(),
+            }),
+            _ => None,
+        };
+        Ok(CrossrefResponse {
+            status: fragment.status,
+            message_type: fragment.message_type,
+            message_version: fragment.message_version,
+            message,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct Msg {
-    #[serde(default)]
-    pub facets: FacetMap,
-    pub total_results: usize,
-    pub items: Vec<ResponseMessage>,
-    pub items_per_page: usize,
-    pub query: Option<QueryResponse>,
+pub enum ResponseMessage {
+    ValidationFailure(Vec<Failure>),
+    RouteNotFound,
+    WorkAgency(WorkAgency),
+    Prefix(Prefix),
+    Type(CrossRefType),
+    TypeList(Vec<CrossRefType>),
+    Work(Box<Work>),
+    WorkList(Vec<Work>),
+    Member(Box<Member>),
+    MemberList(Vec<Member>),
+    Journal(Box<Journal>),
+    JournalList(Vec<Journal>),
+    Funder(Box<Funder>),
+    FunderList(Vec<Funder>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct WorkAgency {
+    #[serde(rename = "DOI")]
+    doi: String,
+    agency: Agency,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Prefix {
+    pub member: String,
+    pub name: String,
+    pub prefix: String,
+}
+
+/// the complete Response of the crossref api
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
 pub enum Message {
     /// Singletons are single results. Retrieving metadata for a specific identifier
     /// (e.g. DOI, ISSN, funder_identifier) typically returns in a singleton result.
-    Singleton {},
-    Multi {
-        total_results: i32,
-        items_per_page: i32,
-        items: Vec<Work>,
-    },
-    //    HeadersOnly
-}
+    Single(ResponseMessage),
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum MessageFormat {
-    Single(String),
-    List(Vec<String>),
+    #[serde(rename_all = "kebab-case")]
+    List {
+        #[serde(default)]
+        facets: FacetMap,
+        total_results: usize,
+        items_per_page: Option<usize>,
+        query: Option<QueryResponse>,
+        items: ResponseMessage,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -83,12 +241,39 @@ pub enum MessageType {
     Work,
     WorkList,
     FunderList,
+    Type,
+    TypeList,
     PrefixList,
     MemberList,
+    Journal,
     JournalList,
+    ValidationFailure,
+    RouteNotFound,
 }
 
-// TODO impl custom map deserializer https://serde.rs/deserialize-map.html
+impl MessageType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            MessageType::WorkAgency => "work-agency",
+            MessageType::Funder => "funder",
+            MessageType::Prefix => "prefix",
+            MessageType::Member => "member",
+            MessageType::MemberList => "member-list",
+            MessageType::Work => "work",
+            MessageType::WorkList => "work-list",
+            MessageType::FunderList => "funder-list",
+            MessageType::Type => "type",
+            MessageType::TypeList => "type-list",
+            MessageType::PrefixList => "prefix-list",
+            MessageType::Journal => "journal",
+            MessageType::JournalList => "journal-list",
+            MessageType::ValidationFailure => "validation-failure",
+            MessageType::RouteNotFound => "route-not-found",
+        }
+    }
+}
+
+/// facets are returned as map
 pub type FacetMap = HashMap<String, FacetItem>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -100,29 +285,13 @@ pub struct FacetItem {
     pub values: HashMap<String, usize>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum ResponseMessage {
-    Agency {
-        #[serde(rename = "DOI")]
-        doi: String,
-        agency: Agency,
-    },
-    Prefix {
-        member: String,
-        name: String,
-        prefix: String,
-    },
-    Type(CrossRefType),
-    TypeList(Vec<CrossRefType>),
-    Work(Box<Work>),
-    WorkList(Vec<Work>),
-    MemberList(Vec<Member>),
-    Member(Box<Member>),
-    Journal(Box<Journal>),
-    JournalList(Vec<Journal>),
-    Funder(Box<Funder>),
-    FunderList(Vec<Funder>),
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Failure {
+    #[serde(rename = "type")]
+    type_: String,
+    value: String,
+    message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, Serialize)]
@@ -152,7 +321,7 @@ pub struct Member {
     pub breakdowns: Breakdowns,
     pub prefixes: Vec<String>,
     pub coverage: Coverage,
-    pub prefix: Vec<Prefix>,
+    pub prefix: Vec<RefPrefix>,
     pub id: usize,
     pub tokens: Vec<String>,
     pub counts_type: HashMap<String, HashMap<String, usize>>,
@@ -205,7 +374,7 @@ pub struct Coverage {
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
-pub struct Prefix {
+pub struct RefPrefix {
     pub value: String,
     pub name: String,
     pub public_references: bool,
@@ -234,20 +403,6 @@ pub struct Journal {
 mod tests {
     use super::*;
     use serde_json::*;
-    //    #[test]
-    fn serde_response() {
-        let section = r#"{
-  "status": "ok",
-  "message-type": "work-agency",
-  "message-version": "1.0.0"
-}"#;
-        let ref_type: CrossrefResponse = serde_json::from_str(section).unwrap();
-
-        //        assert_eq!(
-        //            MessageFormat::Single("work-agency".to_string()),
-        //            ref_type.message_type
-        //        )
-    }
 
     #[test]
     fn facets_deserialize() {
@@ -276,19 +431,16 @@ mod tests {
     #[test]
     fn agency_msg_deserialize() {
         let agency_str =
-            r#"{"DOI":"10.1037\/0003-066x.59.1.29","agency":{"id":"crossref","label":"Crossref"}}"#;
+            r#"{"status":"ok","message-type":"work-agency","message-version":"1.0.0","message":{"DOI":"10.1037\/0003-066x.59.1.29","agency":{"id":"crossref","label":"Crossref"}}}"#;
 
-        let agency: ResponseMessage = from_str(agency_str).unwrap();
+        let agency: CrossrefResponse = from_str(agency_str).unwrap();
 
-        match agency {
-            ResponseMessage::Agency { .. } => {}
-            _ => panic!("expected Agency"),
-        }
+        assert!(agency.is_work_ageny());
     }
 
     #[test]
     fn funder_list_msg_deserialize() {
-        let funders_str = r#"[{ "id": "501100004190",
+        let funders_str = r#"{"status":"ok","message-type":"funder-list","message-version":"1.0.0","message":{"items-per-page":2,"query":{"start-index":0,"search-terms":"NSF"},"total-results":9,"items":[{ "id": "501100004190",
   "location": "Norway",
   "name": "Norsk  Sykepleierforbund",
   "alt-names": [
@@ -300,17 +452,16 @@ mod tests {
   "tokens": [
     "norsk"
   ]
-}]"#;
+}]}}"#;
 
-        let funders: ResponseMessage = from_str(funders_str).unwrap();
-        match funders {
-            ResponseMessage::FunderList(_) => {}
-            _ => panic!("expected FunderList"),
-        }
+        let funders: CrossrefResponse = from_str(funders_str).unwrap();
+
+        assert!(funders.is_funder_list());
     }
+
     #[test]
     fn funder_msg_deserialize() {
-        let funder_str = r#"{ "id": "501100004190",
+        let funder_str = r#"{"status":"ok","message-type":"funder","message-version":"1.0.0","message":{ "id": "501100004190",
   "location": "Norway",
   "name": "Norsk  Sykepleierforbund",
   "alt-names": [
@@ -331,97 +482,88 @@ mod tests {
     "hierarchy": {
       "100000019": {}
   }
-}"#;
+}}"#;
 
-        let funder: ResponseMessage = from_str(funder_str).unwrap();
-        match funder {
-            ResponseMessage::Funder(_) => {}
-            _ => panic!("expected single Funder"),
-        }
+        let funder: CrossrefResponse = from_str(funder_str).unwrap();
+
+        assert!(funder.is_funder());
     }
 
     #[test]
     fn funder_msg_deserialize2() {
-        let funder_str = r#"{"hierarchy-names":{"100006130":"Office","100000015":"U.S. Department of Energy","100013165":"National"},"replaced-by":[],"work-count":44026,"name":"U.S. Department of Energy","descendants":["100006166"],"descendant-work-count":68704,"id":"100000015","tokens":["us"],"replaces":[],"uri":"http:\/\/dx.doi.org\/10.13039\/100000015","hierarchy":{"100000015":{"100006130":{"more":true},"100013165":{},"100006138":{"more":true}}},"alt-names":["DOE"],"location":"United States"}"#;
+        let funder_str = r#"{"status":"ok","message-type":"funder","message-version":"1.0.0","message":{"hierarchy-names":{"100006130":"Office","100000015":"U.S. Department of Energy","100013165":"National"},"replaced-by":[],"work-count":44026,"name":"U.S. Department of Energy","descendants":["100006166"],"descendant-work-count":68704,"id":"100000015","tokens":["us"],"replaces":[],"uri":"http:\/\/dx.doi.org\/10.13039\/100000015","hierarchy":{"100000015":{"100006130":{"more":true},"100013165":{},"100006138":{"more":true}}},"alt-names":["DOE"],"location":"United States"}}"#;
 
-        let funder: ResponseMessage = from_str(funder_str).unwrap();
-        match funder {
-            ResponseMessage::Funder(_) => {}
-            _ => panic!("expected single Funder"),
-        }
+        let funder: CrossrefResponse = from_str(funder_str).unwrap();
+
+        assert!(funder.is_funder());
     }
 
     #[test]
     fn prefix_msg_deserialize() {
-        let prefix_str = r#"{"member":"http:\/\/id.crossref.org\/member\/78","name":"Elsevier BV","prefix":"http:\/\/id.crossref.org\/prefix\/10.1016"}"#;
+        let prefix_str = r#"{"status":"ok","message-type":"prefix","message-version":"1.0.0","message":{"member":"http:\/\/id.crossref.org\/member\/78","name":"Elsevier BV","prefix":"http:\/\/id.crossref.org\/prefix\/10.1016"}}"#;
 
-        let prefix: ResponseMessage = from_str(prefix_str).unwrap();
-        match prefix {
-            ResponseMessage::Prefix { .. } => {}
-            _ => panic!("expected Prefix"),
-        }
+        let prefix: CrossrefResponse = from_str(prefix_str).unwrap();
+
+        assert!(prefix.is_prefix());
     }
+
     #[test]
     fn members_list_msg_deserialize() {
-        let members_list_str = r#"[{"last-status-check-time":1551766727771,"primary-name":"Society for Leukocyte Biology","counts":{"total-dois":0,"current-dois":0,"backfile-dois":0},"breakdowns":{"dois-by-issued-year":[]},"prefixes":["10.1189"],"coverage":{"affiliations-current":0,"similarity-checking-current":0,"funders-backfile":0,"licenses-backfile":0,"funders-current":0,"affiliations-backfile":0,"resource-links-backfile":0,"orcids-backfile":0,"update-policies-current":0,"open-references-backfile":0,"orcids-current":0,"similarity-checking-backfile":0,"references-backfile":0,"award-numbers-backfile":0,"update-policies-backfile":0,"licenses-current":0,"award-numbers-current":0,"abstracts-backfile":0,"resource-links-current":0,"abstracts-current":0,"open-references-current":0,"references-current":0},"prefix":[{"value":"10.1189","name":"Society for Leukocyte Biology","public-references":false,"reference-visibility":"limited"}],"id":183,"tokens":["society","for","leukocyte","biology"],"counts-type":{"all":{},"current":{},"backfile":{}},"coverage-type":{"all":null,"backfile":null,"current":null},"flags":{"deposits-abstracts-current":false,"deposits-orcids-current":false,"deposits":false,"deposits-affiliations-backfile":false,"deposits-update-policies-backfile":false,"deposits-similarity-checking-backfile":false,"deposits-award-numbers-current":false,"deposits-resource-links-current":false,"deposits-articles":false,"deposits-affiliations-current":false,"deposits-funders-current":false,"deposits-references-backfile":false,"deposits-abstracts-backfile":false,"deposits-licenses-backfile":false,"deposits-award-numbers-backfile":false,"deposits-open-references-backfile":false,"deposits-open-references-current":false,"deposits-references-current":false,"deposits-resource-links-backfile":false,"deposits-orcids-backfile":false,"deposits-funders-backfile":false,"deposits-update-policies-current":false,"deposits-similarity-checking-current":false,"deposits-licenses-current":false},"location":"9650 Rockville Pike Attn: Lynn Willis Bethesda MD 20814 United States","names":["Society for Leukocyte Biology"]}]"#;
+        let members_list_str = r#"{"status":"ok","message-type":"member-list","message-version":"1.0.0","message":{"items-per-page":2,"query":{"start-index":0,"search-terms":null},"total-results":10257,"items":[{"last-status-check-time":1551766727771,"primary-name":"Society for Leukocyte Biology","counts":{"total-dois":0,"current-dois":0,"backfile-dois":0},"breakdowns":{"dois-by-issued-year":[]},"prefixes":["10.1189"],"coverage":{"affiliations-current":0,"similarity-checking-current":0,"funders-backfile":0,"licenses-backfile":0,"funders-current":0,"affiliations-backfile":0,"resource-links-backfile":0,"orcids-backfile":0,"update-policies-current":0,"open-references-backfile":0,"orcids-current":0,"similarity-checking-backfile":0,"references-backfile":0,"award-numbers-backfile":0,"update-policies-backfile":0,"licenses-current":0,"award-numbers-current":0,"abstracts-backfile":0,"resource-links-current":0,"abstracts-current":0,"open-references-current":0,"references-current":0},"prefix":[{"value":"10.1189","name":"Society for Leukocyte Biology","public-references":false,"reference-visibility":"limited"}],"id":183,"tokens":["society","for","leukocyte","biology"],"counts-type":{"all":{},"current":{},"backfile":{}},"coverage-type":{"all":null,"backfile":null,"current":null},"flags":{"deposits-abstracts-current":false,"deposits-orcids-current":false,"deposits":false,"deposits-affiliations-backfile":false,"deposits-update-policies-backfile":false,"deposits-similarity-checking-backfile":false,"deposits-award-numbers-current":false,"deposits-resource-links-current":false,"deposits-articles":false,"deposits-affiliations-current":false,"deposits-funders-current":false,"deposits-references-backfile":false,"deposits-abstracts-backfile":false,"deposits-licenses-backfile":false,"deposits-award-numbers-backfile":false,"deposits-open-references-backfile":false,"deposits-open-references-current":false,"deposits-references-current":false,"deposits-resource-links-backfile":false,"deposits-orcids-backfile":false,"deposits-funders-backfile":false,"deposits-update-policies-current":false,"deposits-similarity-checking-current":false,"deposits-licenses-current":false},"location":"9650 Rockville Pike Attn: Lynn Willis Bethesda MD 20814 United States","names":["Society for Leukocyte Biology"]}]}}"#;
 
-        let members_list: ResponseMessage = from_str(members_list_str).unwrap();
-        match members_list {
-            ResponseMessage::MemberList(_) => {}
-            _ => panic!("expected MemberList"),
-        }
+        let members_list: CrossrefResponse = from_str(members_list_str).unwrap();
+
+        assert!(members_list.is_member_list());
     }
+
     #[test]
     fn member_msg_deserialize() {
-        let member_str = r#"{"last-status-check-time":1551766727771,"primary-name":"Society for Leukocyte Biology","counts":{"total-dois":0,"current-dois":0,"backfile-dois":0},"breakdowns":{"dois-by-issued-year":[]},"prefixes":["10.1189"],"coverage":{"affiliations-current":0,"similarity-checking-current":0,"funders-backfile":0,"licenses-backfile":0,"funders-current":0,"affiliations-backfile":0,"resource-links-backfile":0,"orcids-backfile":0,"update-policies-current":0,"open-references-backfile":0,"orcids-current":0,"similarity-checking-backfile":0,"references-backfile":0,"award-numbers-backfile":0,"update-policies-backfile":0,"licenses-current":0,"award-numbers-current":0,"abstracts-backfile":0,"resource-links-current":0,"abstracts-current":0,"open-references-current":0,"references-current":0},"prefix":[{"value":"10.1189","name":"Society for Leukocyte Biology","public-references":false,"reference-visibility":"limited"}],"id":183,"tokens":["society","for","leukocyte","biology"],"counts-type":{"all":{},"current":{},"backfile":{}},"coverage-type":{"all":null,"backfile":null,"current":null},"flags":{"deposits-abstracts-current":false,"deposits-orcids-current":false,"deposits":false,"deposits-affiliations-backfile":false,"deposits-update-policies-backfile":false,"deposits-similarity-checking-backfile":false,"deposits-award-numbers-current":false,"deposits-resource-links-current":false,"deposits-articles":false,"deposits-affiliations-current":false,"deposits-funders-current":false,"deposits-references-backfile":false,"deposits-abstracts-backfile":false,"deposits-licenses-backfile":false,"deposits-award-numbers-backfile":false,"deposits-open-references-backfile":false,"deposits-open-references-current":false,"deposits-references-current":false,"deposits-resource-links-backfile":false,"deposits-orcids-backfile":false,"deposits-funders-backfile":false,"deposits-update-policies-current":false,"deposits-similarity-checking-current":false,"deposits-licenses-current":false},"location":"9650 Rockville Pike Attn: Lynn Willis Bethesda MD 20814 United States","names":["Society for Leukocyte Biology"]}"#;
+        let member_str = r#"{"status":"ok","message-type":"member","message-version":"1.0.0","message":{"last-status-check-time":1551766727771,"primary-name":"Society for Leukocyte Biology","counts":{"total-dois":0,"current-dois":0,"backfile-dois":0},"breakdowns":{"dois-by-issued-year":[]},"prefixes":["10.1189"],"coverage":{"affiliations-current":0,"similarity-checking-current":0,"funders-backfile":0,"licenses-backfile":0,"funders-current":0,"affiliations-backfile":0,"resource-links-backfile":0,"orcids-backfile":0,"update-policies-current":0,"open-references-backfile":0,"orcids-current":0,"similarity-checking-backfile":0,"references-backfile":0,"award-numbers-backfile":0,"update-policies-backfile":0,"licenses-current":0,"award-numbers-current":0,"abstracts-backfile":0,"resource-links-current":0,"abstracts-current":0,"open-references-current":0,"references-current":0},"prefix":[{"value":"10.1189","name":"Society for Leukocyte Biology","public-references":false,"reference-visibility":"limited"}],"id":183,"tokens":["society","for","leukocyte","biology"],"counts-type":{"all":{},"current":{},"backfile":{}},"coverage-type":{"all":null,"backfile":null,"current":null},"flags":{"deposits-abstracts-current":false,"deposits-orcids-current":false,"deposits":false,"deposits-affiliations-backfile":false,"deposits-update-policies-backfile":false,"deposits-similarity-checking-backfile":false,"deposits-award-numbers-current":false,"deposits-resource-links-current":false,"deposits-articles":false,"deposits-affiliations-current":false,"deposits-funders-current":false,"deposits-references-backfile":false,"deposits-abstracts-backfile":false,"deposits-licenses-backfile":false,"deposits-award-numbers-backfile":false,"deposits-open-references-backfile":false,"deposits-open-references-current":false,"deposits-references-current":false,"deposits-resource-links-backfile":false,"deposits-orcids-backfile":false,"deposits-funders-backfile":false,"deposits-update-policies-current":false,"deposits-similarity-checking-current":false,"deposits-licenses-current":false},"location":"9650 Rockville Pike Attn: Lynn Willis Bethesda MD 20814 United States","names":["Society for Leukocyte Biology"]}}"#;
 
-        let member: ResponseMessage = from_str(member_str).unwrap();
-        match member {
-            ResponseMessage::Member(_) => {}
-            _ => panic!("expected Member"),
-        }
+        let member: CrossrefResponse = from_str(member_str).unwrap();
+
+        assert!(member.is_member());
     }
 
     #[test]
     fn journals_list_msg_deserialize() {
-        let journal_list_str = r#"[{"last-status-check-time":null,"counts":null,"breakdowns":null,"publisher":"Fundacao Educacional de Criciuma- FUCRI","coverage":null,"title":"A INFLU\u00caNCIA DA PUBLICIDADE NA TRANSI\u00c7\u00c3O NUTRICIONAL UMA S\u00cdNTESE PARA ENTENDER A OBESIDADE","subjects":[],"coverage-type":null,"flags":null,"ISSN":[],"issn-type":[]}]"#;
+        let journal_list_str = r#"{"status":"ok","message-type":"journal-list","message-version":"1.0.0","message":{"items-per-page":2,"query":{"start-index":0,"search-terms":null},"total-results":10257,"items":[{"last-status-check-time":null,"counts":null,"breakdowns":null,"publisher":"Fundacao Educacional de Criciuma- FUCRI","coverage":null,"title":"A INFLU\u00caNCIA DA PUBLICIDADE NA TRANSI\u00c7\u00c3O NUTRICIONAL UMA S\u00cdNTESE PARA ENTENDER A OBESIDADE","subjects":[],"coverage-type":null,"flags":null,"ISSN":[],"issn-type":[]}]}}"#;
 
-        let journal_list: ResponseMessage = from_str(journal_list_str).unwrap();
+        let journal_list: CrossrefResponse = from_str(journal_list_str).unwrap();
 
-        match journal_list {
-            ResponseMessage::JournalList(_) => {}
-            _ => panic!("expected JournalList"),
-        }
+        assert!(journal_list.is_journal_list());
     }
+
     #[test]
     fn journal_msg_deserialize() {
-        let journal_str = r#"{"last-status-check-time":null,"counts":null,"breakdowns":null,"publisher":"Fundacao Educacional de Criciuma- FUCRI","coverage":null,"title":"A INFLU\u00caNCIA DA PUBLICIDADE NA TRANSI\u00c7\u00c3O NUTRICIONAL UMA S\u00cdNTESE PARA ENTENDER A OBESIDADE","subjects":[],"coverage-type":null,"flags":null,"ISSN":[],"issn-type":[]}"#;
+        let journal_str = r#"{"status":"ok","message-type":"journal","message-version":"1.0.0","message":{"last-status-check-time":null,"counts":null,"breakdowns":null,"publisher":"Fundacao Educacional de Criciuma- FUCRI","coverage":null,"title":"A INFLU\u00caNCIA DA PUBLICIDADE NA TRANSI\u00c7\u00c3O NUTRICIONAL UMA S\u00cdNTESE PARA ENTENDER A OBESIDADE","subjects":[],"coverage-type":null,"flags":null,"ISSN":[],"issn-type":[]}}"#;
 
-        let journal: ResponseMessage = from_str(journal_str).unwrap();
+        let journal: CrossrefResponse = from_str(journal_str).unwrap();
 
-        match journal {
-            ResponseMessage::Journal(_) => {}
-            _ => panic!("expected Journal"),
-        }
+        assert!(journal.is_journal());
     }
 
     #[test]
     fn type_list_msg_deserialize() {
-        let type_list_str = r#"[{"id":"book-section","label":"Book Section"},{"id":"monograph","label":"Monograph"}]"#;
-        let type_list: ResponseMessage = from_str(type_list_str).unwrap();
-        match type_list {
-            ResponseMessage::TypeList(_) => {}
-            _ => panic!("expected TypeList"),
-        }
+        let type_list_str = r#"{"status":"ok","message-type":"type-list","message-version":"1.0.0","message":{"total-results":27,"items":[{"id":"book-section","label":"Book Section"},{"id":"monograph","label":"Monograph"}]}}"#;
+        let type_list: CrossrefResponse = from_str(type_list_str).unwrap();
+
+        assert!(type_list.is_type_list());
     }
+
     #[test]
     fn type_msg_deserialize() {
-        let type_str = r#"{"id":"book-section","label":"Book Section"}"#;
-        let type_: ResponseMessage = from_str(type_str).unwrap();
+        let type_str = r#"{"status":"ok","message-type":"type","message-version":"1.0.0","message":{"id":"book-section","label":"Book Section"}}"#;
+        let type_: CrossrefResponse = from_str(type_str).unwrap();
 
-        match type_ {
-            ResponseMessage::Type(_) => {}
-            _ => panic!("expected Type"),
-        }
+        assert!(type_.is_type());
+    }
+
+    #[test]
+    fn validation_failure_deserialize() {
+        let failure_str = r#"{"status":"failed","message-type":"validation-failure","message":[{"type":"parameter-not-allowed","value":"query.*","message":"This route does not support field query parameters"}]}"#;
+        let failure: CrossrefResponse = from_str(failure_str).unwrap();
+
+        assert!(failure.is_validation_failure());
     }
 }
