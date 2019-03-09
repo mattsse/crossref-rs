@@ -11,24 +11,10 @@ use serde_json::{from_value, Value};
 use std::collections::HashMap;
 use std::fmt;
 
-/// Represents the crossref response for a `work` request.
-/// requesting an url: `https://api.crossref.org/works/10.1037/0003-066X.59.1.29/agency`
-/// will return following result:
-/// r#"{
-///  status: "ok",
-///  message-type: "work-agency",
-///  message-version: "1.0.0",
-///  message: {
-///    DOI: "10.1037/0003-066x.59.1.29",
-///    agency: {
-///      id: "crossref",
-///      label: "Crossref"
-///    }
-///  }#"
-///
+/// Represents the whole crossref response for a any request.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct CrossrefResponse {
+pub struct Response {
     /// the status of the request
     pub status: String,
     /// the type of the response message holds
@@ -40,13 +26,15 @@ pub struct CrossrefResponse {
     pub message: Option<Message>,
 }
 
-fn default_msg_version() -> String{"1.0.0".to_string()}
+fn default_msg_version() -> String {
+    "1.0.0".to_string()
+}
 
 macro_rules! impl_msg_helper {
     (single: $($name:ident -> $ident:ident,)*) => {
     $(
         pub fn $name(&self) -> bool {
-           if let Some(Message::Single(ResponseMessage::$ident(_))) = &self.message {
+           if let Some(Message::Single(ResponseItem::$ident(_))) = &self.message {
                true
            } else {
                false
@@ -59,7 +47,7 @@ macro_rules! impl_msg_helper {
         pub fn $name(&self) -> bool {
             match &self.message {
                 Some(Message::List{items, ..}) => {
-                    if let ResponseMessage::$ident(_) = items {
+                    if let ResponseItem::$ident(_) = items {
                         true
                     } else {
                         false
@@ -72,7 +60,7 @@ macro_rules! impl_msg_helper {
     };
 }
 
-impl CrossrefResponse {
+impl Response {
     impl_msg_helper!(single:
         is_work_ageny -> WorkAgency,
         is_funder -> Funder,
@@ -93,13 +81,13 @@ impl CrossrefResponse {
 
     pub fn is_route_not_found(&self) -> bool {
         match &self.message {
-            Some(Message::Single(ResponseMessage::RouteNotFound)) => true,
+            Some(Message::Single(ResponseItem::RouteNotFound)) => true,
             _ => false,
         }
     }
 }
 
-impl<'de> Deserialize<'de> for CrossrefResponse {
+impl<'de> Deserialize<'de> for Response {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -129,7 +117,7 @@ impl<'de> Deserialize<'de> for CrossrefResponse {
 
         macro_rules! msg_arm {
             ($ident:ident, $value:expr) => {{
-                Message::Single(ResponseMessage::$ident(
+                Message::Single(ResponseItem::$ident(
                     ::serde_json::from_value($value).map_err(de::Error::custom)?,
                 ))
             }};
@@ -138,7 +126,7 @@ impl<'de> Deserialize<'de> for CrossrefResponse {
             ($ident:ident, $value:expr) => {{
                 let list_resp: ListResp =
                     ::serde_json::from_value($value).map_err(de::Error::custom)?;
-                let items = ResponseMessage::$ident(
+                let items = ResponseItem::$ident(
                     ::serde_json::from_value(list_resp.items).map_err(de::Error::custom)?,
                 );
                 Message::List {
@@ -170,7 +158,7 @@ impl<'de> Deserialize<'de> for CrossrefResponse {
             }),
             _ => None,
         };
-        Ok(CrossrefResponse {
+        Ok(Response {
             status: fragment.status,
             message_type: fragment.message_type,
             message_version: fragment.message_version,
@@ -179,9 +167,10 @@ impl<'de> Deserialize<'de> for CrossrefResponse {
     }
 }
 
+/// the different payloads of a response
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum ResponseMessage {
+pub enum ResponseItem {
     ValidationFailure(Vec<Failure>),
     RouteNotFound,
     WorkAgency(WorkAgency),
@@ -198,6 +187,7 @@ pub enum ResponseMessage {
     FunderList(Vec<Funder>),
 }
 
+/// response item for the `/works/{id}/agency` route
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WorkAgency {
     #[serde(rename = "DOI")]
@@ -205,6 +195,7 @@ pub struct WorkAgency {
     agency: Agency,
 }
 
+/// response item for the `/prefix/{id}/` route
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Prefix {
     pub member: String,
@@ -212,13 +203,13 @@ pub struct Prefix {
     pub prefix: String,
 }
 
-/// the complete Response of the crossref api
+/// a response payload can be a single item or a list of items and additional fields
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Message {
     /// Singletons are single results. Retrieving metadata for a specific identifier
     /// (e.g. DOI, ISSN, funder_identifier) typically returns in a singleton result.
-    Single(ResponseMessage),
+    Single(ResponseItem),
 
     #[serde(rename_all = "kebab-case")]
     List {
@@ -227,10 +218,11 @@ pub enum Message {
         total_results: usize,
         items_per_page: Option<usize>,
         query: Option<QueryResponse>,
-        items: ResponseMessage,
+        items: ResponseItem,
     },
 }
 
+/// all possible `message-type` of a response
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum MessageType {
@@ -276,6 +268,7 @@ impl MessageType {
 /// facets are returned as map
 pub type FacetMap = HashMap<String, FacetItem>;
 
+/// if a `facet` was set in a request `FacetMap` will be  in a `List` response as additional field of the message
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct FacetItem {
@@ -285,7 +278,8 @@ pub struct FacetItem {
     pub values: HashMap<String, usize>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+/// response item if a request could be processed
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Failure {
     #[serde(rename = "type")]
@@ -294,7 +288,8 @@ pub struct Failure {
     message: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, Serialize)]
+/// response item for the `/funder/{id}` route
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
 pub struct Funder {
     pub hierarchy_names: HashMap<String, Option<String>>,
@@ -312,6 +307,7 @@ pub struct Funder {
     pub tokens: Vec<String>,
 }
 
+/// response item for the `/member/{id}` route
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case", default)]
 pub struct Member {
@@ -381,6 +377,7 @@ pub struct RefPrefix {
     pub reference_visibility: Option<Visibility>,
 }
 
+/// response item for the `/journal/{id}` route
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Journal {
@@ -433,7 +430,7 @@ mod tests {
         let agency_str =
             r#"{"status":"ok","message-type":"work-agency","message-version":"1.0.0","message":{"DOI":"10.1037\/0003-066x.59.1.29","agency":{"id":"crossref","label":"Crossref"}}}"#;
 
-        let agency: CrossrefResponse = from_str(agency_str).unwrap();
+        let agency: Response = from_str(agency_str).unwrap();
 
         assert!(agency.is_work_ageny());
     }
@@ -454,7 +451,7 @@ mod tests {
   ]
 }]}}"#;
 
-        let funders: CrossrefResponse = from_str(funders_str).unwrap();
+        let funders: Response = from_str(funders_str).unwrap();
 
         assert!(funders.is_funder_list());
     }
@@ -484,7 +481,7 @@ mod tests {
   }
 }}"#;
 
-        let funder: CrossrefResponse = from_str(funder_str).unwrap();
+        let funder: Response = from_str(funder_str).unwrap();
 
         assert!(funder.is_funder());
     }
@@ -493,7 +490,7 @@ mod tests {
     fn funder_msg_deserialize2() {
         let funder_str = r#"{"status":"ok","message-type":"funder","message-version":"1.0.0","message":{"hierarchy-names":{"100006130":"Office","100000015":"U.S. Department of Energy","100013165":"National"},"replaced-by":[],"work-count":44026,"name":"U.S. Department of Energy","descendants":["100006166"],"descendant-work-count":68704,"id":"100000015","tokens":["us"],"replaces":[],"uri":"http:\/\/dx.doi.org\/10.13039\/100000015","hierarchy":{"100000015":{"100006130":{"more":true},"100013165":{},"100006138":{"more":true}}},"alt-names":["DOE"],"location":"United States"}}"#;
 
-        let funder: CrossrefResponse = from_str(funder_str).unwrap();
+        let funder: Response = from_str(funder_str).unwrap();
 
         assert!(funder.is_funder());
     }
@@ -502,7 +499,7 @@ mod tests {
     fn prefix_msg_deserialize() {
         let prefix_str = r#"{"status":"ok","message-type":"prefix","message-version":"1.0.0","message":{"member":"http:\/\/id.crossref.org\/member\/78","name":"Elsevier BV","prefix":"http:\/\/id.crossref.org\/prefix\/10.1016"}}"#;
 
-        let prefix: CrossrefResponse = from_str(prefix_str).unwrap();
+        let prefix: Response = from_str(prefix_str).unwrap();
 
         assert!(prefix.is_prefix());
     }
@@ -511,7 +508,7 @@ mod tests {
     fn members_list_msg_deserialize() {
         let members_list_str = r#"{"status":"ok","message-type":"member-list","message-version":"1.0.0","message":{"items-per-page":2,"query":{"start-index":0,"search-terms":null},"total-results":10257,"items":[{"last-status-check-time":1551766727771,"primary-name":"Society for Leukocyte Biology","counts":{"total-dois":0,"current-dois":0,"backfile-dois":0},"breakdowns":{"dois-by-issued-year":[]},"prefixes":["10.1189"],"coverage":{"affiliations-current":0,"similarity-checking-current":0,"funders-backfile":0,"licenses-backfile":0,"funders-current":0,"affiliations-backfile":0,"resource-links-backfile":0,"orcids-backfile":0,"update-policies-current":0,"open-references-backfile":0,"orcids-current":0,"similarity-checking-backfile":0,"references-backfile":0,"award-numbers-backfile":0,"update-policies-backfile":0,"licenses-current":0,"award-numbers-current":0,"abstracts-backfile":0,"resource-links-current":0,"abstracts-current":0,"open-references-current":0,"references-current":0},"prefix":[{"value":"10.1189","name":"Society for Leukocyte Biology","public-references":false,"reference-visibility":"limited"}],"id":183,"tokens":["society","for","leukocyte","biology"],"counts-type":{"all":{},"current":{},"backfile":{}},"coverage-type":{"all":null,"backfile":null,"current":null},"flags":{"deposits-abstracts-current":false,"deposits-orcids-current":false,"deposits":false,"deposits-affiliations-backfile":false,"deposits-update-policies-backfile":false,"deposits-similarity-checking-backfile":false,"deposits-award-numbers-current":false,"deposits-resource-links-current":false,"deposits-articles":false,"deposits-affiliations-current":false,"deposits-funders-current":false,"deposits-references-backfile":false,"deposits-abstracts-backfile":false,"deposits-licenses-backfile":false,"deposits-award-numbers-backfile":false,"deposits-open-references-backfile":false,"deposits-open-references-current":false,"deposits-references-current":false,"deposits-resource-links-backfile":false,"deposits-orcids-backfile":false,"deposits-funders-backfile":false,"deposits-update-policies-current":false,"deposits-similarity-checking-current":false,"deposits-licenses-current":false},"location":"9650 Rockville Pike Attn: Lynn Willis Bethesda MD 20814 United States","names":["Society for Leukocyte Biology"]}]}}"#;
 
-        let members_list: CrossrefResponse = from_str(members_list_str).unwrap();
+        let members_list: Response = from_str(members_list_str).unwrap();
 
         assert!(members_list.is_member_list());
     }
@@ -520,7 +517,7 @@ mod tests {
     fn member_msg_deserialize() {
         let member_str = r#"{"status":"ok","message-type":"member","message-version":"1.0.0","message":{"last-status-check-time":1551766727771,"primary-name":"Society for Leukocyte Biology","counts":{"total-dois":0,"current-dois":0,"backfile-dois":0},"breakdowns":{"dois-by-issued-year":[]},"prefixes":["10.1189"],"coverage":{"affiliations-current":0,"similarity-checking-current":0,"funders-backfile":0,"licenses-backfile":0,"funders-current":0,"affiliations-backfile":0,"resource-links-backfile":0,"orcids-backfile":0,"update-policies-current":0,"open-references-backfile":0,"orcids-current":0,"similarity-checking-backfile":0,"references-backfile":0,"award-numbers-backfile":0,"update-policies-backfile":0,"licenses-current":0,"award-numbers-current":0,"abstracts-backfile":0,"resource-links-current":0,"abstracts-current":0,"open-references-current":0,"references-current":0},"prefix":[{"value":"10.1189","name":"Society for Leukocyte Biology","public-references":false,"reference-visibility":"limited"}],"id":183,"tokens":["society","for","leukocyte","biology"],"counts-type":{"all":{},"current":{},"backfile":{}},"coverage-type":{"all":null,"backfile":null,"current":null},"flags":{"deposits-abstracts-current":false,"deposits-orcids-current":false,"deposits":false,"deposits-affiliations-backfile":false,"deposits-update-policies-backfile":false,"deposits-similarity-checking-backfile":false,"deposits-award-numbers-current":false,"deposits-resource-links-current":false,"deposits-articles":false,"deposits-affiliations-current":false,"deposits-funders-current":false,"deposits-references-backfile":false,"deposits-abstracts-backfile":false,"deposits-licenses-backfile":false,"deposits-award-numbers-backfile":false,"deposits-open-references-backfile":false,"deposits-open-references-current":false,"deposits-references-current":false,"deposits-resource-links-backfile":false,"deposits-orcids-backfile":false,"deposits-funders-backfile":false,"deposits-update-policies-current":false,"deposits-similarity-checking-current":false,"deposits-licenses-current":false},"location":"9650 Rockville Pike Attn: Lynn Willis Bethesda MD 20814 United States","names":["Society for Leukocyte Biology"]}}"#;
 
-        let member: CrossrefResponse = from_str(member_str).unwrap();
+        let member: Response = from_str(member_str).unwrap();
 
         assert!(member.is_member());
     }
@@ -529,7 +526,7 @@ mod tests {
     fn journals_list_msg_deserialize() {
         let journal_list_str = r#"{"status":"ok","message-type":"journal-list","message-version":"1.0.0","message":{"items-per-page":2,"query":{"start-index":0,"search-terms":null},"total-results":10257,"items":[{"last-status-check-time":null,"counts":null,"breakdowns":null,"publisher":"Fundacao Educacional de Criciuma- FUCRI","coverage":null,"title":"A INFLU\u00caNCIA DA PUBLICIDADE NA TRANSI\u00c7\u00c3O NUTRICIONAL UMA S\u00cdNTESE PARA ENTENDER A OBESIDADE","subjects":[],"coverage-type":null,"flags":null,"ISSN":[],"issn-type":[]}]}}"#;
 
-        let journal_list: CrossrefResponse = from_str(journal_list_str).unwrap();
+        let journal_list: Response = from_str(journal_list_str).unwrap();
 
         assert!(journal_list.is_journal_list());
     }
@@ -538,7 +535,7 @@ mod tests {
     fn journal_msg_deserialize() {
         let journal_str = r#"{"status":"ok","message-type":"journal","message-version":"1.0.0","message":{"last-status-check-time":null,"counts":null,"breakdowns":null,"publisher":"Fundacao Educacional de Criciuma- FUCRI","coverage":null,"title":"A INFLU\u00caNCIA DA PUBLICIDADE NA TRANSI\u00c7\u00c3O NUTRICIONAL UMA S\u00cdNTESE PARA ENTENDER A OBESIDADE","subjects":[],"coverage-type":null,"flags":null,"ISSN":[],"issn-type":[]}}"#;
 
-        let journal: CrossrefResponse = from_str(journal_str).unwrap();
+        let journal: Response = from_str(journal_str).unwrap();
 
         assert!(journal.is_journal());
     }
@@ -546,7 +543,7 @@ mod tests {
     #[test]
     fn type_list_msg_deserialize() {
         let type_list_str = r#"{"status":"ok","message-type":"type-list","message-version":"1.0.0","message":{"total-results":27,"items":[{"id":"book-section","label":"Book Section"},{"id":"monograph","label":"Monograph"}]}}"#;
-        let type_list: CrossrefResponse = from_str(type_list_str).unwrap();
+        let type_list: Response = from_str(type_list_str).unwrap();
 
         assert!(type_list.is_type_list());
     }
@@ -554,7 +551,7 @@ mod tests {
     #[test]
     fn type_msg_deserialize() {
         let type_str = r#"{"status":"ok","message-type":"type","message-version":"1.0.0","message":{"id":"book-section","label":"Book Section"}}"#;
-        let type_: CrossrefResponse = from_str(type_str).unwrap();
+        let type_: Response = from_str(type_str).unwrap();
 
         assert!(type_.is_type());
     }
@@ -562,7 +559,7 @@ mod tests {
     #[test]
     fn validation_failure_deserialize() {
         let failure_str = r#"{"status":"failed","message-type":"validation-failure","message":[{"type":"parameter-not-allowed","value":"query.*","message":"This route does not support field query parameters"}]}"#;
-        let failure: CrossrefResponse = from_str(failure_str).unwrap();
+        let failure: Response = from_str(failure_str).unwrap();
 
         assert!(failure.is_validation_failure());
     }
