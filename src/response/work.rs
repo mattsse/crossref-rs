@@ -269,7 +269,7 @@ impl Date {
 pub struct PartialDate {
     /// Contains an ordered array of year, month, day of month.
     /// Only year is required
-    /// e.g. [ [ 2006 ] ] to conform to citeproc JSON dates
+    /// e.g. `[ [`2006`] ]` to conform to citeproc JSON dates
     #[serde(rename = "date-parts")]
     pub date_parts: DateParts,
 }

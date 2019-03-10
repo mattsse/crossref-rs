@@ -233,7 +233,7 @@ impl CrossrefQueryParam for Order {
 pub enum Sort {
     /// Sort by relevance score
     Score,
-    /// Sort by date of most recent change to metadata. Currently the same as [Deposited]
+    /// Sort by date of most recent change to metadata. Currently the same as `Deposited`
     Updated,
     /// Sort by time of most recent deposit
     Deposited,
@@ -517,7 +517,7 @@ pub trait CrossrefQuery: CrossrefRoute {
     /// the resource component endpoint this route targets
     fn resource_component(self) -> ResourceComponent;
 
-    /// constructs the full request url by concating the [base_path] with the [route]
+    /// constructs the full request url by concating the `base_path` with the `route`
     fn to_url(&self, base_path: &str) -> Result<String> {
         Ok(format!("{}{}", base_path, self.route()?))
     }

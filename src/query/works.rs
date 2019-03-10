@@ -301,7 +301,7 @@ pub struct FieldQuery {
 }
 
 impl FieldQuery {
-    /// creates a new [Field] query for `title` and `subtitle`
+    /// creates a new `Field` query for `title` and `subtitle`
     pub fn title(title: &str) -> Self {
         Self {
             name: "title".to_string(),
@@ -309,49 +309,49 @@ impl FieldQuery {
         }
     }
 
-    /// creates a new [Field] query for `container-title` aka `publication.name`
+    /// creates a new `Field` query for `container-title` aka `publication.name`
     pub fn container_title(container_title: &str) -> Self {
         Self {
             name: "container-title".to_string(),
             value: container_title.to_string(),
         }
     }
-    /// creates a new [Field] query author given and family names
+    /// creates a new `Field` query author given and family names
     pub fn author(author: &str) -> Self {
         Self {
             name: "author".to_string(),
             value: author.to_string(),
         }
     }
-    /// creates a new [Field] query for editor given and family names
+    /// creates a new `Field` query for editor given and family names
     pub fn editor(editor: &str) -> Self {
         Self {
             name: "editor".to_string(),
             value: editor.to_string(),
         }
     }
-    /// creates a new [Field] query for chair given and family names
+    /// creates a new `Field` query for chair given and family names
     pub fn chair(chair: &str) -> Self {
         Self {
             name: "chair".to_string(),
             value: chair.to_string(),
         }
     }
-    /// creates a new [Field] query for translator given and family names
+    /// creates a new `Field` query for translator given and family names
     pub fn translator(translator: &str) -> Self {
         Self {
             name: "translator".to_string(),
             value: translator.to_string(),
         }
     }
-    /// creates a new [Field] query for author, editor, chair and translator given and family names
+    /// creates a new `Field` query for author, editor, chair and translator given and family names
     pub fn contributor(contributor: &str) -> Self {
         Self {
             name: "contributor".to_string(),
             value: contributor.to_string(),
         }
     }
-    /// creates a new [Field] query for bibliographic information, useful for citation look up.
+    /// creates a new `Field` query for bibliographic information, useful for citation look up.
     /// Includes titles, authors, ISSNs and publication years
     pub fn bibliographic(bibliographic: &str) -> Self {
         Self {
@@ -359,7 +359,7 @@ impl FieldQuery {
             value: bibliographic.to_string(),
         }
     }
-    /// creates a new [Field] query for contributor affiliations
+    /// creates a new `Field` query for contributor affiliations
     pub fn affiliation(affiliation: &str) -> Self {
         Self {
             name: "affiliation".to_string(),

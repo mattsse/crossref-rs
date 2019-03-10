@@ -108,20 +108,20 @@ impl<'de> Deserialize<'de> for Response {
             ($ident:ident, $value:expr) => {{
                 Message::$ident(::serde_json::from_value($value).map_err(de::Error::custom)?)
             }};
-        ($ident:ident, $value:expr, $ty:ty) => {{
-            let list_resp: ListResp =
-            ::serde_json::from_value($value).map_err(de::Error::custom)?;
-            let items : Vec<$ty> =
-            ::serde_json::from_value(list_resp.items).map_err(de::Error::custom)?;
-            Message::$ident($ident {
-                facets: list_resp.facets,
-                total_results: list_resp.total_results,
-                items_per_page: list_resp.items_per_page,
-                query: list_resp.query,
-                items,
-            }
-        }};
-    }
+            ($ident:ident, $value:expr, $ty:ty) => {{
+                let list_resp: ListResp =
+                    ::serde_json::from_value($value).map_err(de::Error::custom)?;
+                let items: Vec<$ty> =
+                    ::serde_json::from_value(list_resp.items).map_err(de::Error::custom)?;
+                Message::$ident($ident {
+                    facets: list_resp.facets,
+                    total_results: list_resp.total_results,
+                    items_per_page: list_resp.items_per_page,
+                    query: list_resp.query,
+                    items,
+                })
+            }};
+        }
 
         fn work_list(msg: Value) -> Result<Message, serde_json::Error> {
             let list_resp: ListResp = ::serde_json::from_value(msg)?;

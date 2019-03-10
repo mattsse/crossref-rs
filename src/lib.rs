@@ -1,6 +1,6 @@
 //! This crate provides a client for interacting with the crossref-api
 //!
-#![deny(warnings)]
+//#![deny(warnings)]
 #![deny(missing_docs)]
 #![allow(unused)]
 #[macro_use]
