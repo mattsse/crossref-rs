@@ -624,6 +624,24 @@ impl WorksQuery {
         self
     }
 
+    /// set the cursor for result control deep paging
+    pub fn next_cursor(mut self, cursor: &str) -> Self {
+        let rows = match self.result_control {
+            Some(WorkResultControl::Standard(ResultControl::Rows(rows))) => Some(rows),
+            _ => None,
+        };
+        self.result_control = Some(WorkResultControl::Cursor {
+            token: Some(cursor.to_string()),
+            rows,
+        });
+        self
+    }
+
+    /// set an empty cursor
+    pub fn new_cursor(mut self) -> Self {
+        self.result_control = Some(WorkResultControl::new_cursor());
+        self
+    }
     /// set result control option to query
     pub fn result_control(mut self, result_control: WorkResultControl) -> Self {
         self.result_control = Some(result_control);

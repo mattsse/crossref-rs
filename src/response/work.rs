@@ -1,6 +1,8 @@
 // see https://github.com/Crossref/rest-api-doc/blob/master/api_format.md
 
+use crate::error::Result;
 use crate::response::{FacetMap, QueryResponse};
+use crate::{Crossref, WorksQuery};
 use chrono::NaiveDate;
 
 /// A hashmap containing relation name, Relation pairs.
@@ -21,6 +23,25 @@ pub struct WorkList {
     pub items: Vec<Work>,
     /// deep page through `/works` result sets
     pub next_cursor: Option<String>,
+}
+
+/// Allows iterating of deep page work request
+pub struct WorkIterator<'a> {
+    /// the query for each request
+    // TODO support also other routes: WorksCombined + primary component
+    query: WorksQuery,
+    /// performs the request
+    client: &'a Crossref,
+    /// stores how many results already retrieved
+    index: usize,
+}
+
+impl<'a> Iterator for WorkIterator<'a> {
+    type Item = WorkList;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        unimplemented!()
+    }
 }
 
 /// the main return type of the crossref api

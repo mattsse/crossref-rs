@@ -123,6 +123,30 @@ impl Crossref {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// [Deep paging results](https://github.com/CrossRef/rest-api-doc#deep-paging-with-cursors)
+    ///
+    /// ```edition2018
+    /// use crossref::{Crossref, WorksQuery, WorksFilter};
+    /// # fn run() -> Result<(), crossref::Error> {
+    /// let client = Crossref::builder().build()?;
+    ///
+    /// // request a next-cursor first
+    /// let query = WorksQuery::new()
+    ///     .query("Machine Learning")
+    ///     .new_cursor();
+    ///
+    /// let works = client.works(query.clone())?;
+    ///
+    /// // this continues from where this first response stopped
+    /// // if no more work items are available then a empty list will be returned
+    /// let deep_works = client.works(
+    ///     query.next_cursor(&works.next_cursor.unwrap())
+    /// )?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// This method fails if the `works` element expands to a bad route `ResourceNotFound`

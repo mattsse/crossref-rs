@@ -360,6 +360,19 @@ impl CrossrefRoute for Component {
     }
 }
 
+#[allow(missing_docs)]
+pub struct WorksRequest {
+    primary_component: Component,
+    query: WorksQuery,
+    id: Option<String>,
+}
+
+impl CrossrefRoute for WorksRequest {
+    fn route(&self) -> Result<String> {
+        unimplemented!()
+    }
+}
+
 /// bundles all available crossref api endpoints
 ///
 ///
