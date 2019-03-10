@@ -8,7 +8,7 @@ keywords = ["api", "web", "literature", "doi"]
 repository = "https://github.com/MattsSe/crossref-rs"
 description= "Implementation of the Crossref API"
 documentation = "https://docs.rs/crossref/"
-categories = ["API bindings"]
+categories = ["api-bindings", "science"]
 edition = "2018"
 
 [badges]
