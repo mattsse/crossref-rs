@@ -5,8 +5,6 @@ Crossref-rs - A rust client for the Crossref-API
 [![Documentation](https://docs.rs/crossref/badge.svg)](https://docs.rs/crossref)
 
 
-API Documentation: [latest release](https://docs.rs/corssref) – [master branch](https://docs.crossref.rs)
-
 [Crossref API docs](https://github.com/CrossRef/rest-api-doc>)
 
 This client is inspired by [sckott/habanero](https://github.com/sckott/habanero/).
@@ -60,7 +58,6 @@ For each resource components that supports querying there exist a Query struct: 
 otherwise creating queries works the same for all resource components:
 
 ```rust
-use crossref::*;
 
 let query = WorksQuery::new()
     .query("Machine Learning")
@@ -86,7 +83,6 @@ There are 3 available targets:
 This resembles in the enums of the resource components, eg. for `Members`:
 
 ```rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Members {
     /// target a specific member at `/members/{id}`
     Identifier(String),
