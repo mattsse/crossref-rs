@@ -153,12 +153,16 @@ impl<'de> Deserialize<'de> for Response {
             let works: Vec<Work> = ::serde_json::from_value(list_resp.items)?;
 
             Ok(Message::List {
-                facets: list_resp.facets,
-                total_results: list_resp.total_results,
-                items_per_page: list_resp.items_per_page,
-                query: list_resp.query,
+                facets: list_resp.facets.clone(),
+                total_results: list_resp.total_results.clone(),
+                items_per_page: list_resp.items_per_page.clone(),
+                query: list_resp.query.clone(),
                 items: ResponseItem::WorkList(WorkList {
-                    works,
+                    facets: list_resp.facets,
+                    total_results: list_resp.total_results,
+                    items_per_page: list_resp.items_per_page,
+                    query: list_resp.query,
+                    items: works,
                     next_cursor: list_resp.next_cursor,
                 }),
             })
@@ -192,6 +196,35 @@ impl<'de> Deserialize<'de> for Response {
     }
 }
 
+macro_rules! impl_list_response {
+    ($($name:ident<$ty:ty>,)*) => {
+    $(
+        #[derive(Debug, Clone, Deserialize, Serialize)]
+        #[serde(rename_all = "kebab-case")]
+        #[allow(missing_docs)]
+        pub struct $name {
+             /// if facets where part in the request they are also included in the response
+            #[serde(default)]
+            pub facets: FacetMap,
+            /// the number of items that match the response
+            pub total_results: usize,
+            /// crossref responses for large number of items are divided in pages, number of elements to expect in `items`
+            pub items_per_page: Option<usize>,
+            /// if a query was set in the request, this will also be part in the response
+            pub query: Option<QueryResponse>,
+            /// all actual message items of the response
+            pub items: Vec<$ty>,
+        }
+    )+
+    };
+}
+impl_list_response!(
+    TypeList<CrossrefType>,
+    MemberList<Member>,
+    JournalList<Journal>,
+    FunderList<Funder>,
+);
+
 /// the different payloads of a response
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -208,7 +241,7 @@ pub enum ResponseItem {
     Type(CrossrefType),
     /// a list of valid work types
     TypeList(Vec<CrossrefType>),
-    /// a publication(journal, articels...)
+    /// a publication(journal, articles...)
     Work(Box<Work>),
     /// a list of publications
     WorkList(WorkList),

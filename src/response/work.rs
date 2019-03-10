@@ -1,5 +1,6 @@
 // see https://github.com/Crossref/rest-api-doc/blob/master/api_format.md
 
+use crate::response::{FacetMap, QueryResponse};
 use chrono::NaiveDate;
 
 /// A hashmap containing relation name, Relation pairs.
@@ -9,8 +10,15 @@ pub type Relations = std::collections::HashMap<String, Relation>;
 #[serde(rename_all = "kebab-case")]
 #[allow(missing_docs)]
 pub struct WorkList {
+    pub facets: FacetMap,
+    /// the number of items that match the response
+    pub total_results: usize,
+    /// crossref responses for large number of items are divided in pages, number of elements to expect in `items`
+    pub items_per_page: Option<usize>,
+    /// if a query was set in the request, this will also be part in the response
+    pub query: Option<QueryResponse>,
     /// all work items that are returned
-    pub works: Vec<Work>,
+    pub items: Vec<Work>,
     /// deep page through `/works` result sets
     pub next_cursor: Option<String>,
 }
