@@ -12,7 +12,6 @@ use std::fmt;
 pub mod work;
 
 pub use crate::response::work::{Work, WorkList};
-use core::fmt::Pointer;
 
 /// Represents the whole crossref response for a any request.
 #[derive(Debug, Clone, Serialize)]
@@ -40,27 +39,10 @@ macro_rules! impl_msg_helper {
     $(
         /// checks if the message holds the variant
         pub fn $name(&self) -> bool {
-           if let Some(Message::Single(ResponseItem::$ident(_))) = &self.message {
+           if let Some(Message::$ident(_)) = &self.message {
                true
            } else {
                false
-           }
-        }
-    )+
-    };
-    (list: $($name:ident -> $ident:ident,)*) => {
-    $(
-        /// checks if the message holds the variant
-        pub fn $name(&self) -> bool {
-            match &self.message {
-                Some(Message::List{items, ..}) => {
-                    if let ResponseItem::$ident(_) = items {
-                        true
-                    } else {
-                        false
-                    }
-                },
-                _ => false
            }
         }
     )+
@@ -77,8 +59,6 @@ impl Response {
         is_journal -> Journal,
         is_member -> Member,
         is_validation_failure -> ValidationFailure,
-    );
-    impl_msg_helper!(list:
         is_type_list -> TypeList,
         is_work_list -> WorkList,
         is_member_list -> MemberList,
@@ -89,7 +69,7 @@ impl Response {
     /// checks whether the `message` holds a variant of `RouteNotFound`
     pub fn is_route_not_found(&self) -> bool {
         match &self.message {
-            Some(Message::Single(ResponseItem::RouteNotFound)) => true,
+            Some(Message::RouteNotFound) => true,
             _ => false,
         }
     }
@@ -126,46 +106,35 @@ impl<'de> Deserialize<'de> for Response {
 
         macro_rules! msg_arm {
             ($ident:ident, $value:expr) => {{
-                Message::Single(ResponseItem::$ident(
-                    ::serde_json::from_value($value).map_err(de::Error::custom)?,
-                ))
+                Message::$ident(::serde_json::from_value($value).map_err(de::Error::custom)?)
             }};
-        }
-        macro_rules! msg_arm_list {
-            ($ident:ident, $value:expr) => {{
-                let list_resp: ListResp =
-                    ::serde_json::from_value($value).map_err(de::Error::custom)?;
-                let items = ResponseItem::$ident(
-                    ::serde_json::from_value(list_resp.items).map_err(de::Error::custom)?,
-                );
-                Message::List {
-                    facets: list_resp.facets,
-                    total_results: list_resp.total_results,
-                    items_per_page: list_resp.items_per_page,
-                    query: list_resp.query,
-                    items,
-                }
-            }};
-        }
+        ($ident:ident, $value:expr, $ty:ty) => {{
+            let list_resp: ListResp =
+            ::serde_json::from_value($value).map_err(de::Error::custom)?;
+            let items : Vec<$ty> =
+            ::serde_json::from_value(list_resp.items).map_err(de::Error::custom)?;
+            Message::$ident($ident {
+                facets: list_resp.facets,
+                total_results: list_resp.total_results,
+                items_per_page: list_resp.items_per_page,
+                query: list_resp.query,
+                items,
+            }
+        }};
+    }
 
         fn work_list(msg: Value) -> Result<Message, serde_json::Error> {
             let list_resp: ListResp = ::serde_json::from_value(msg)?;
-            let works: Vec<Work> = ::serde_json::from_value(list_resp.items)?;
+            let items: Vec<Work> = ::serde_json::from_value(list_resp.items)?;
 
-            Ok(Message::List {
-                facets: list_resp.facets.clone(),
-                total_results: list_resp.total_results.clone(),
-                items_per_page: list_resp.items_per_page.clone(),
-                query: list_resp.query.clone(),
-                items: ResponseItem::WorkList(WorkList {
-                    facets: list_resp.facets,
-                    total_results: list_resp.total_results,
-                    items_per_page: list_resp.items_per_page,
-                    query: list_resp.query,
-                    items: works,
-                    next_cursor: list_resp.next_cursor,
-                }),
-            })
+            Ok(Message::WorkList(WorkList {
+                facets: list_resp.facets,
+                total_results: list_resp.total_results,
+                items_per_page: list_resp.items_per_page,
+                query: list_resp.query,
+                items,
+                next_cursor: list_resp.next_cursor,
+            }))
         }
 
         let message = match fragment.message {
@@ -174,16 +143,16 @@ impl<'de> Deserialize<'de> for Response {
                 MessageType::WorkAgency => msg_arm!(WorkAgency, msg),
                 MessageType::Prefix => msg_arm!(Prefix, msg),
                 MessageType::Type => msg_arm!(Type, msg),
-                MessageType::TypeList => msg_arm_list!(TypeList, msg),
+                MessageType::TypeList => msg_arm!(TypeList, msg, CrossrefType),
                 MessageType::Work => msg_arm!(Work, msg),
                 MessageType::WorkList => work_list(msg).map_err(de::Error::custom)?,
                 MessageType::Member => msg_arm!(Member, msg),
-                MessageType::MemberList => msg_arm_list!(MemberList, msg),
+                MessageType::MemberList => msg_arm!(MemberList, msg, Member),
                 MessageType::Journal => msg_arm!(Journal, msg),
-                MessageType::JournalList => msg_arm_list!(JournalList, msg),
+                MessageType::JournalList => msg_arm!(JournalList, msg, Journal),
                 MessageType::Funder => msg_arm!(Funder, msg),
-                MessageType::FunderList => msg_arm_list!(FunderList, msg),
-                _ => unreachable!(),
+                MessageType::FunderList => msg_arm!(FunderList, msg, Funder),
+                MessageType::RouteNotFound => Message::RouteNotFound,
             }),
             _ => None,
         };
@@ -227,8 +196,8 @@ impl_list_response!(
 
 /// the different payloads of a response
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum ResponseItem {
+#[serde(untagged)]
+pub enum Message {
     /// if a request failed on the server side
     ValidationFailure(Vec<Failure>),
     /// a route could not be found on the server side
@@ -240,7 +209,7 @@ pub enum ResponseItem {
     /// a valid work type
     Type(CrossrefType),
     /// a list of valid work types
-    TypeList(Vec<CrossrefType>),
+    TypeList(TypeList),
     /// a publication(journal, articles...)
     Work(Box<Work>),
     /// a list of publications
@@ -248,15 +217,15 @@ pub enum ResponseItem {
     /// a crossref member (mostly publishers)
     Member(Box<Member>),
     /// a list of crossref members
-    MemberList(Vec<Member>),
+    MemberList(MemberList),
     /// a Journal publication
     Journal(Box<Journal>),
     /// list of journal publications
-    JournalList(Vec<Journal>),
+    JournalList(JournalList),
     /// a funder in the [funder registry](https://github.com/Crossref/open-funder-registry)
     Funder(Box<Funder>),
     /// a list of funder
-    FunderList(Vec<Funder>),
+    FunderList(FunderList),
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -293,31 +262,6 @@ pub struct Prefix {
     pub member: String,
     pub name: String,
     pub prefix: String,
-}
-
-/// a response payload can be a single item or a list of items and additional fields
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum Message {
-    /// Singletons are single results. Retrieving metadata for a specific identifier
-    /// (e.g. DOI, ISSN, funder_identifier) typically returns in a singleton result.
-    Single(ResponseItem),
-
-    /// a response message that holds a list of items and metadata
-    #[serde(rename_all = "kebab-case")]
-    List {
-        /// if facets where part in the request they are also included in the response
-        #[serde(default)]
-        facets: FacetMap,
-        /// the number of items that match the response
-        total_results: usize,
-        /// crossref responses for large number of items are divided in pages, number of elements to expect in `items`
-        items_per_page: Option<usize>,
-        /// if a query was set in the request, this will also be part in the response
-        query: Option<QueryResponse>,
-        /// a list of items, can only be one of the `List` of `ResponseItem`
-        items: ResponseItem,
-    },
 }
 
 /// all possible `message-type` of a response

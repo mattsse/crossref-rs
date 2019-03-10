@@ -28,24 +28,23 @@ pub use self::query::{CrossrefQuery, CrossrefRoute, Order, Sort};
 
 pub use self::query::{Funders, Journals, Members, Prefixes, Type, Types};
 
-pub use self::response::{CrossrefType, Funder, Journal, Member, Work, WorkAgency, WorkList};
+pub use self::response::{
+    CrossrefType, Funder, FunderList, Journal, JournalList, Member, MemberList, TypeList, Work,
+    WorkAgency, WorkList,
+};
 
-pub(crate) use self::response::{Message, Response, ResponseItem};
-
-/// A convenience module appropriate for glob imports (`use crossref::prelude::*;`).
-use serde::{Deserialize, Serialize};
+pub(crate) use self::response::{Message, Response};
 
 use crate::error::ErrorKind;
 use crate::query::{FundersQuery, MembersQuery};
 use crate::response::{MessageType, Prefix};
 use reqwest::{self, Client};
-use serde_json::to_string;
 
 macro_rules! get_item {
     ($ident:ident, $value:expr, $got:expr) => {
         if let Some(msg) = $value {
             match msg {
-                Message::Single(ResponseItem::$ident(item)) => Ok(item),
+                Message::$ident(item) => Ok(item),
                 _ => Err(ErrorKind::UnexpectedItem {
                     expected: MessageType::$ident,
                     got: $got,
@@ -57,28 +56,6 @@ macro_rules! get_item {
                 expected: MessageType::$ident,
             }
             .into())
-        }
-    };
-}
-
-macro_rules! get_item_list {
-    ($ident:ident, $value:expr, $got:expr) => {
-        match $value {
-            Some(Message::List { items, .. }) => {
-                if let ResponseItem::$ident(item) = items {
-                    Ok(item)
-                } else {
-                    Err(ErrorKind::UnexpectedItem {
-                        expected: MessageType::$ident,
-                        got: $got,
-                    }
-                    .into())
-                }
-            }
-            _ => Err(ErrorKind::MissingMessage {
-                expected: MessageType::$ident,
-            }
-            .into()),
         }
     };
 }
@@ -154,7 +131,7 @@ impl Crossref {
     pub fn works(&self, query: WorksQuery) -> Result<WorkList> {
         let resp = self.get_response(Works::Query(query))?;
         // TODO add deep paging support
-        get_item_list!(WorkList, resp.message, resp.message_type)
+        get_item!(WorkList, resp.message, resp.message_type)
     }
 
     /// Return the `Work` that is identified by  the `doi`.
@@ -208,9 +185,9 @@ impl Crossref {
     }
 
     /// Return the matching `Funders` items.
-    pub fn funders(&self, funders: FundersQuery) -> Result<Vec<Funder>> {
+    pub fn funders(&self, funders: FundersQuery) -> Result<FunderList> {
         let resp = self.get_response(Funders::Query(funders))?;
-        get_item_list!(FunderList, resp.message, resp.message_type)
+        get_item!(FunderList, resp.message, resp.message_type)
     }
 
     /// Return the `Funder` for the `id`
@@ -225,13 +202,13 @@ impl Crossref {
             funder_id,
             WorksQuery::new().query(term),
         )))?;
-        get_item_list!(WorkList, resp.message, resp.message_type)
+        get_item!(WorkList, resp.message, resp.message_type)
     }
 
     /// Return the matching `Members` items.
-    pub fn members(&self, members: MembersQuery) -> Result<Vec<Member>> {
+    pub fn members(&self, members: MembersQuery) -> Result<MemberList> {
         let resp = self.get_response(Members::Query(members))?;
-        get_item_list!(MemberList, resp.message, resp.message_type)
+        get_item!(MemberList, resp.message, resp.message_type)
     }
 
     /// Return the `Member` for the `id`
@@ -246,7 +223,7 @@ impl Crossref {
             member_id,
             WorksQuery::new().query(term),
         )))?;
-        get_item_list!(WorkList, resp.message, resp.message_type)
+        get_item!(WorkList, resp.message, resp.message_type)
     }
 
     /// Return the `Prefix` for the `id`
@@ -261,13 +238,13 @@ impl Crossref {
             prefix_id,
             WorksQuery::new().query(term),
         )))?;
-        get_item_list!(WorkList, resp.message, resp.message_type)
+        get_item!(WorkList, resp.message, resp.message_type)
     }
 
     /// Return all available `Type`
-    pub fn types(&self) -> Result<Vec<CrossrefType>> {
+    pub fn types(&self) -> Result<TypeList> {
         let resp = self.get_response(Types::All)?;
-        get_item_list!(TypeList, resp.message, resp.message_type)
+        get_item!(TypeList, resp.message, resp.message_type)
     }
 
     /// Return the `Type` for the `id`
@@ -282,7 +259,7 @@ impl Crossref {
             type_.id(),
             WorksQuery::new().query(term),
         )))?;
-        get_item_list!(WorkList, resp.message, resp.message_type)
+        get_item!(WorkList, resp.message, resp.message_type)
     }
 }
 
