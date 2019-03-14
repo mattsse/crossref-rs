@@ -8,7 +8,7 @@ use chrono::NaiveDate;
 /// A hashmap containing relation name, Relation pairs.
 pub type Relations = std::collections::HashMap<String, Relation>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 #[allow(missing_docs)]
 pub struct WorkList {
@@ -48,7 +48,7 @@ impl<'a> Iterator for WorkIterator<'a> {
 /// represents a publication
 /// based on the [crossref rest-api-doc](https://github.com/CrossRef/rest-api-doc/blob/master/api_format.md#work)
 /// with minor adjustments
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 #[allow(missing_docs)]
 pub struct Work {
@@ -91,8 +91,9 @@ pub struct Work {
     pub date: Option<Date>,
     /// Date on which the work metadata was most recently updated
     pub deposited: Option<Date>,
-    /// the works crossref score
-    pub score: Option<i32>,
+    /// the score of the publication if any
+    /// not included in the crossrif api spec
+    pub score: Option<f32>,
     /// Date on which the work metadata was most recently indexed.
     /// Re-indexing does not imply a metadata change, see `deposited` for the most recent metadata change date
     pub indexed: Date,
