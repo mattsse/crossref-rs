@@ -1,6 +1,6 @@
 //! This crate provides a client for interacting with the crossref-api
 //!
-//! [Crossref API docs](https://github.com/CrossRef/rest-api-doc>)
+//! [Crossref API docs](https://github.com/CrossRef/rest-api-doc)
 //! `Crossref` - Crossref search API. The `Crossref` crate provides methods matching Crossref API routes:
 
 //! * `works` - `/works` route
@@ -93,7 +93,7 @@
 //!     Identifier(String),
 //!     /// target all members that match the query at `/members?query...`
 //!     Query(MembersQuery),
-//!     /// target a `Work` for a specific funder at `/members/{id}/works?query..`
+//!     /// target a `Work` for a specific member at `/members/{id}/works?query..`
 //!     Works(WorksCombined),
 //! }
 //! ```
@@ -148,11 +148,11 @@
 //!
 //! For each resource component other than `Works` there exist methods to append a `WorksQuery` with the ID option `/members/{member_id}/works?<query>?`
 //!
-//! ```rustnorun
+//! ```
 //! # use crossref::*;
 //! # fn run() -> Result<()> {
 //! # let client = Crossref::builder().build()?;
-//! let works = client.member_works("member_id", WorksQuery::new()
+//! let works = client.member_works_query("member_id", WorksQuery::new()
 //! .query("machine learning")
 //! .sort(Sort::Score))?;
 //! # Ok(())
@@ -198,6 +198,12 @@ mod error;
 pub mod query;
 /// provides the response types of the crossref api
 pub mod response;
+
+// TODO extract to optional feature?
+/// content negotiation
+pub mod cn;
+/// textual data mining
+pub mod tdm;
 
 /// an async client
 #[cfg(feature = "client")]
@@ -247,6 +253,17 @@ macro_rules! get_item {
     };
 }
 
+// TODO macros or design overhaul?
+macro_rules! impl_query {
+    ($($name:ident  $component:ident,)*) => {
+        $( /// Return one page of the components's `Work` that match the query
+        pub fn $name(&self, id: &str, query: WorksQuery) -> Result<WorkList> {
+            let resp = self.get_response($component::Works(WorksCombined::new(id, query)))?;
+            get_item!(WorkList, resp.message, resp.message_type)
+        })+
+    };
+}
+
 /// Struct for Crossref search API methods
 #[derive(Debug, Clone)]
 pub struct Crossref {
@@ -258,6 +275,9 @@ pub struct Crossref {
 
 impl Crossref {
     const BASE_URL: &'static str = "https://api.crossref.org";
+
+    impl_query!(funder_works_query Funders, member_works_query Members,
+    type_works_query Types, journal_works_query Journals,);
 
     /// Constructs a new `CrossrefBuilder`.
     ///
@@ -473,6 +493,24 @@ impl Crossref {
             WorksQuery::new().query(term),
         )))?;
         get_item!(WorkList, resp.message, resp.message_type)
+    }
+
+    /// Get a random set of DOIs
+    ///
+    /// # Example
+    ///
+    /// ```edition2018
+    /// use crossref::Crossref;
+    /// # fn run() -> Result<(), crossref::Error> {
+    /// # let client = Crossref::builder().build()?;
+    /// // this will return 10 random dois from the crossref api
+    /// let random_dois = client.random_dois(10)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn random_dois(&self, len: usize) -> Result<Vec<String>> {
+        self.works(WorksQuery::random(len))
+            .map(|x| x.items.into_iter().map(|x| x.doi).collect())
     }
 }
 

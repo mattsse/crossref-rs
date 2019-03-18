@@ -549,6 +549,9 @@ pub struct WorksQuery {
     pub facets: Vec<FacetCount>,
     /// deep page through `/works` result sets
     pub result_control: Option<WorkResultControl>,
+    /// request random dois
+    /// if set all other parameters are ignored
+    pub sample: Option<usize>,
 }
 
 impl WorksQuery {
@@ -557,11 +560,22 @@ impl WorksQuery {
         WorksQuery::default()
     }
 
+    /// creates an new `WorksQuery` with the desired sample size that will result in
+    /// a request for random dois
+    pub fn random(len: usize) -> Self {
+        WorksQuery::default().sample(len)
+    }
+
     /// alias for creating an new default element
     pub fn new() -> Self {
         WorksQuery::default()
     }
 
+    /// add a new free form query
+    pub fn sample(mut self, len: usize) -> Self {
+        self.sample = Some(len);
+        self
+    }
     /// add a new free form query
     pub fn query(mut self, query: &str) -> Self {
         self.free_form_queries.push(query.to_string());
@@ -652,6 +666,11 @@ impl WorksQuery {
 impl CrossrefRoute for WorksQuery {
     fn route(&self) -> Result<String> {
         let mut params = Vec::new();
+
+        if let Some(sample) = self.sample {
+            return Ok(format!("sample={}", sample));
+        }
+
         if !self.free_form_queries.is_empty() {
             params.push(Cow::Owned(format!(
                 "query={}",
