@@ -66,7 +66,7 @@ pub enum ErrorKind {
     MissingMessage { expected: MessageType },
     /// When crossref could not find anything
     #[fail(display = "Nothing was found for resource `{}`", resource)]
-    ResourceNotFound { resource: ResourceComponent },
+    ResourceNotFound { resource: Box<ResourceComponent> },
     /// if a error in serde occurred
     #[fail(display = "invalid serde: {}", error)]
     Serde { error: serde_json::Error },

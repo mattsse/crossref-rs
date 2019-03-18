@@ -301,7 +301,7 @@ impl Crossref {
             .text()?;
         if resp.starts_with("Resource not found") {
             Err(ErrorKind::ResourceNotFound {
-                resource: query.resource_component(),
+                resource: Box::new(query.resource_component()),
             }
             .into())
         } else {
