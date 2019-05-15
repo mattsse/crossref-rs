@@ -4,11 +4,15 @@ use crate::error::Result;
 use crate::response::{FacetMap, QueryResponse};
 use crate::{Crossref, WorksQuery};
 use chrono::NaiveDate;
+use serde_json::Value;
 
-/// A hashmap containing relation name, Relation pairs.
-pub type Relations = std::collections::HashMap<String, Relation>;
+/// A hashmap containing relation name, `Relation` pairs.
+/// [crossref rest-api-doc](https://github.com/CrossRef/rest-api-doc/blob/master/api_format.md#relations)
+/// However it seems, that the value of the relation name can also be an array.
+/// Therefor the `serde_json::Value` type is used instead to prevent an invalid length error
+pub type Relations = std::collections::HashMap<String, Value>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 #[allow(missing_docs)]
 pub struct WorkList {
@@ -48,7 +52,7 @@ impl<'a> Iterator for WorkIterator<'a> {
 /// represents a publication
 /// based on the [crossref rest-api-doc](https://github.com/CrossRef/rest-api-doc/blob/master/api_format.md#work)
 /// with minor adjustments
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 #[allow(missing_docs)]
 pub struct Work {
@@ -92,7 +96,7 @@ pub struct Work {
     /// Date on which the work metadata was most recently updated
     pub deposited: Option<Date>,
     /// the works crossref score
-    pub score: Option<i32>,
+    pub score: Option<f32>,
     /// Date on which the work metadata was most recently indexed.
     /// Re-indexing does not imply a metadata change, see `deposited` for the most recent metadata change date
     pub indexed: Date,
