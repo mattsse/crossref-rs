@@ -95,7 +95,8 @@ pub struct Work {
     pub date: Option<Date>,
     /// Date on which the work metadata was most recently updated
     pub deposited: Option<Date>,
-    /// the works crossref score
+    /// the score of the publication if any
+    /// not included in the crossrif api spec
     pub score: Option<f32>,
     /// Date on which the work metadata was most recently indexed.
     /// Re-indexing does not imply a metadata change, see `deposited` for the most recent metadata change date
