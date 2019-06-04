@@ -25,8 +25,8 @@ serde_derive = "1.0"
 serde = "1.0"
 failure = "0.1"
 serde_json = "1.0"
-chrono =  {version = "0.4", features = ["serde"] }
-hyper-tls = { version = "0.3", optional= true }
+chrono =  { version = "0.4", features = ["serde"] }
+hyper-tls = { version = "0.3", optional = true }
 hyper = { version = "0.12", optional = true }
 structopt =  { version =  "0.2", optional = true }
 url = "1.7"

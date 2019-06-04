@@ -374,8 +374,6 @@ impl CrossrefRoute for WorksRequest {
 }
 
 /// bundles all available crossref api endpoints
-///
-///
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceComponent {
     /// returns a list of all works (journal articles, conference proceedings, books, components, etc), 20 per page

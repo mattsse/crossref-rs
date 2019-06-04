@@ -471,6 +471,16 @@ impl Works {
     }
 }
 
+pub enum WorksComponent {
+    Single(WorksQuery),
+    Combined(CombinedComponent),
+}
+
+pub struct CombinedComponent {
+    component: Component,
+    combined: WorksCombined,
+}
+
 impl CrossrefRoute for Works {
     fn route(&self) -> Result<String> {
         match self {
@@ -502,7 +512,8 @@ impl CrossrefQuery for Works {
 ///
 /// let combined = WorksCombined::new("100000015", WorksQuery::new().query("ontologies"));
 /// ```
-/// helper struct to capture an id for a [Component] other than `/works` and an additional query for the `/works` route
+/// helper struct to capture an id for a `Component` other than `/works` and an additional query for the `/works` route
+// TODO rename `WorksIdent`?
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorksCombined {
     /// the id of an component item other than `Component::Works`
@@ -519,39 +530,6 @@ impl WorksCombined {
             query,
         }
     }
-}
-
-/// Used to construct a query that targets crossref `Works` elements
-///
-/// # Example
-///
-/// ```edition2018
-/// use crossref::{Order, WorksQuery};
-///
-/// // create a new query for topcis machine+learning ordered desc
-/// let query = WorksQuery::new().query("machine learning").order(Order::Desc);
-/// ```
-///
-/// Each query parameter is ANDed
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct WorksQuery {
-    /// search by non specific query
-    pub free_form_queries: Vec<String>,
-    /// match only particular fields of metadata
-    pub field_queries: Vec<FieldQuery>,
-    /// filter to apply while querying
-    pub filter: Vec<WorksFilter>,
-    /// sort results by a certain field and
-    pub sort: Option<Sort>,
-    /// set the sort order to `asc` or `desc`
-    pub order: Option<Order>,
-    /// enable facet information in responses
-    pub facets: Vec<FacetCount>,
-    /// deep page through `/works` result sets
-    pub result_control: Option<WorkResultControl>,
-    /// request random dois
-    /// if set all other parameters are ignored
-    pub sample: Option<usize>,
 }
 
 impl WorksQuery {
@@ -576,11 +554,13 @@ impl WorksQuery {
         self.sample = Some(len);
         self
     }
+
     /// add a new free form query
     pub fn query(mut self, query: &str) -> Self {
         self.free_form_queries.push(query.to_string());
         self
     }
+
     /// Create a new query for the topics renear+ontologies
     ///
     /// # Example
@@ -661,6 +641,46 @@ impl WorksQuery {
         self.result_control = Some(result_control);
         self
     }
+
+    // TODO impl methods to construct a `WorksComponent` from the query, either by taking a special trait
+    ///
+    // fail on unsupported route or take a trait?
+    pub fn into_combined<T: Into<String>>(self, component: Component, id: T) -> WorksComponent {
+        unimplemented!()
+    }
+}
+
+/// Used to construct a query that targets crossref `Works` elements
+///
+/// # Example
+///
+/// ```edition2018
+/// use crossref::{Order, WorksQuery};
+///
+/// // create a new query for topcis machine+learning ordered desc
+/// let query = WorksQuery::new().query("machine learning").order(Order::Desc);
+/// ```
+///
+/// Each query parameter is ANDed
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WorksQuery {
+    /// search by non specific query
+    pub free_form_queries: Vec<String>,
+    /// match only particular fields of metadata
+    pub field_queries: Vec<FieldQuery>,
+    /// filter to apply while querying
+    pub filter: Vec<WorksFilter>,
+    /// sort results by a certain field and
+    pub sort: Option<Sort>,
+    /// set the sort order to `asc` or `desc`
+    pub order: Option<Order>,
+    /// enable facet information in responses
+    pub facets: Vec<FacetCount>,
+    /// deep page through `/works` result sets
+    pub result_control: Option<WorkResultControl>,
+    /// request random dois
+    /// if set all other parameters are ignored
+    pub sample: Option<usize>,
 }
 
 impl CrossrefRoute for WorksQuery {

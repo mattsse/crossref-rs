@@ -188,7 +188,7 @@
 //!
 //!
 //#![deny(warnings)]
-#![deny(missing_docs)]
+//#![deny(missing_docs)]
 #![allow(unused)]
 #[macro_use]
 extern crate serde_derive;
@@ -205,10 +205,6 @@ pub mod cn;
 /// textual data mining
 pub mod tdm;
 
-/// an async client
-#[cfg(feature = "client")]
-pub mod client;
-
 #[doc(inline)]
 pub use self::error::{Error, Result};
 
@@ -216,11 +212,10 @@ pub use self::error::{Error, Result};
 pub use self::query::works::{
     FieldQuery, WorkResultControl, Works, WorksCombined, WorksFilter, WorksQuery,
 };
+
 #[doc(inline)]
 pub use self::query::{CrossrefQuery, CrossrefRoute, Order, Sort};
-
 pub use self::query::{Funders, Journals, Members, Prefixes, Type, Types};
-
 pub use self::response::{
     CrossrefType, Funder, FunderList, Journal, JournalList, Member, MemberList, TypeList, Work,
     WorkAgency, WorkList,
@@ -229,7 +224,7 @@ pub use self::response::{
 pub(crate) use self::response::{Message, Response};
 
 use crate::error::ErrorKind;
-use crate::query::{FundersQuery, MembersQuery};
+use crate::query::{FundersQuery, MembersQuery, ResourceComponent};
 use crate::response::{MessageType, Prefix};
 use reqwest::{self, Client};
 
@@ -257,6 +252,7 @@ macro_rules! get_item {
 macro_rules! impl_query {
     ($($name:ident  $component:ident,)*) => {
         $( /// Return one page of the components's `Work` that match the query
+        //TODO refactor to take a `WorksComponent`
         pub fn $name(&self, id: &str, query: WorksQuery) -> Result<WorkList> {
             let resp = self.get_response($component::Works(WorksCombined::new(id, query)))?;
             get_item!(WorkList, resp.message, resp.message_type)
@@ -375,6 +371,12 @@ impl Crossref {
     pub fn work(&self, doi: &str) -> Result<Work> {
         let resp = self.get_response(Works::Identifier(doi.to_string()))?;
         get_item!(Work, resp.message, resp.message_type).map(|x| *x)
+    }
+
+    pub fn deep_page<T: Into<Works>>(&self) -> DeepPage {
+        // required: primary component + query
+
+        unimplemented!()
     }
 
     /// Return the `Agency` that registers the `Work` identified by  the `doi`.
@@ -607,5 +609,42 @@ impl CrossrefBuilder {
                 .unwrap_or_else(|| Crossref::BASE_URL.to_string()),
             client,
         })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DeepPage<'a> {
+    // TODO support also other routes: WorksCombined + primary component
+    /// the query for each request
+    query: ResourceComponent,
+    /// performs each request
+    client: &'a Crossref,
+}
+
+impl<'a> IntoIterator for DeepPage<'a> {
+    type Item = WorkList;
+    type IntoIter = WorkIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        WorkIterator {
+            deep_page: self,
+            index: 0,
+        }
+    }
+}
+
+/// Allows iterating of deep page work request
+pub struct WorkIterator<'a> {
+    /// stores the query and the client
+    deep_page: DeepPage<'a>,
+    /// stores how many results already retrieved
+    index: usize,
+}
+
+impl<'a> Iterator for WorkIterator<'a> {
+    type Item = WorkList;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        unimplemented!()
     }
 }
