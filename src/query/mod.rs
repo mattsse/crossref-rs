@@ -499,7 +499,7 @@ pub trait CrossrefRoute {
     fn route(&self) -> Result<String>;
 }
 
-impl<T: CrossrefQueryParam> CrossrefRoute for AsRef<[T]> {
+impl<T: CrossrefQueryParam> CrossrefRoute for dyn AsRef<[T]> {
     fn route(&self) -> Result<String> {
         Ok(self
             .as_ref()
