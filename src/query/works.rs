@@ -409,6 +409,12 @@ impl WorkResultControl {
     }
 }
 
+impl Default for WorkResultControl {
+    fn default() -> Self {
+        WorkResultControl::new_cursor()
+    }
+}
+
 impl CrossrefQueryParam for WorkResultControl {
     fn param_key(&self) -> Cow<str> {
         match self {
@@ -494,6 +500,21 @@ pub enum WorkListQuery {
         primary_component: Component,
         ident: WorksIdentQuery,
     },
+}
+
+impl WorkListQuery {
+    pub fn query(&self) -> &WorksQuery {
+        match self {
+            WorkListQuery::Works(query) => query,
+            WorkListQuery::Combined { ident, .. } => &ident.query,
+        }
+    }
+    pub fn query_mut(&mut self) -> &mut WorksQuery {
+        match self {
+            WorkListQuery::Works(query) => query,
+            WorkListQuery::Combined { ident, .. } => &mut ident.query,
+        }
+    }
 }
 
 impl Into<WorkListQuery> for WorksQuery {
@@ -739,6 +760,10 @@ impl WorksQuery {
 
     pub fn into_ident(self, id: &str) -> WorksIdentQuery {
         WorksIdentQuery::new(id, self)
+    }
+
+    pub fn into_list_query<W: WorksCombiner>(self, id: &str) -> WorkListQuery {
+        W::work_list_query(self.into_ident(id))
     }
 }
 

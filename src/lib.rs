@@ -384,10 +384,13 @@ impl Crossref {
         get_item!(Work, resp.message, resp.message_type).map(|x| *x)
     }
 
-    pub fn deep_page<T: Into<WorkListQuery>>(&self, query: T) -> DeepPage {
-        // required: primary component + query
-
-        unimplemented!()
+    pub fn deep_page<T: Into<WorkListQuery>>(&self, query: T) -> WorkListIterator {
+        WorkListIterator {
+            query: query.into(),
+            client: self,
+            index: 0,
+            finish: false,
+        }
     }
 
     /// Return the `Agency` that registers the `Work` identified by  the `doi`.
@@ -627,43 +630,63 @@ impl CrossrefBuilder {
     }
 }
 
-// TODO api design for deep paging
-// TODO new trait for Deeppage
-
-#[derive(Debug, Clone)]
-pub struct DeepPage<'a> {
-    /// the query for each request
+/// Allows iterating of deep page work request
+pub struct WorkListIterator<'a> {
+    /// the query
     query: WorkListQuery,
     /// performs each request
     client: &'a Crossref,
-}
-
-impl<'a> IntoIterator for DeepPage<'a> {
-    type Item = WorkList;
-    type IntoIter = WorkIterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        WorkIterator {
-            deep_page: self,
-            index: 0,
-        }
-    }
-}
-
-/// Allows iterating of deep page work request
-pub struct WorkIterator<'a> {
-    /// stores the query and the client
-    deep_page: DeepPage<'a>,
     /// stores how many results already retrieved
     index: usize,
+
+    finish: bool,
 }
 
-impl<'a> Iterator for WorkIterator<'a> {
+impl<'a> Iterator for WorkListIterator<'a> {
     type Item = WorkList;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // get the cursor, if no cursor was initially set, use `*`
+        if self.finish {
+            return None;
+        }
 
-        unimplemented!()
+        {
+            let control = &mut self.query.query_mut().result_control;
+
+            // if no result control is set, set a new cursor
+            if control.is_none() {
+                *control = Some(WorkResultControl::new_cursor());
+            }
+        }
+
+        let resp = self.client.get_response(&self.query);
+        if let Ok(resp) = resp {
+            let worklist: Result<WorkList> = get_item!(WorkList, resp.message, resp.message_type);
+            if let Ok(worklist) = worklist {
+                if let Some(cursor) = &worklist.next_cursor {
+                    match &mut self.query.query_mut().result_control {
+                        Some(WorkResultControl::Cursor { token, .. }) => {
+                            // use the received cursor token in next iteration
+                            *token = Some(cursor.clone())
+                        }
+                        Some(WorkResultControl::Standard(_)) => {
+                            // standard result control was set, don't deep page and return next iteration
+                            self.finish = true;
+                        }
+                        _ => (),
+                    }
+                } else {
+                    // no cursor received, end next iteration
+                    self.finish = true;
+                }
+                Some(worklist)
+            } else {
+                // failed to deserialize response into `WorkList`
+                None
+            }
+        } else {
+            // no response received
+            None
+        }
     }
 }

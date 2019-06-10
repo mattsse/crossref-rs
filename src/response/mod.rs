@@ -134,7 +134,6 @@ impl<'de> Deserialize<'de> for Response {
                 query: list_resp.query,
                 items,
                 next_cursor: list_resp.next_cursor,
-                work_query: None,
             }))
         }
 
