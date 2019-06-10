@@ -471,16 +471,6 @@ impl Works {
     }
 }
 
-pub enum WorksComponent {
-    Single(WorksQuery),
-    Combined(CombinedComponent),
-}
-
-pub struct CombinedComponent {
-    component: Component,
-    combined: WorksCombined,
-}
-
 impl CrossrefRoute for Works {
     fn route(&self) -> Result<String> {
         match self {
@@ -503,34 +493,86 @@ impl CrossrefQuery for Works {
         ResourceComponent::Works(self)
     }
 }
+
 /// Target `Works` as secondary resource component
 ///
 /// # Example
 ///
 /// ```edition2018
-/// use crossref::{WorksCombined,WorksQuery};
+/// use crossref::{WorksIdentQuery,WorksQuery};
 ///
-/// let combined = WorksCombined::new("100000015", WorksQuery::new().query("ontologies"));
+/// let combined = WorksIdentQuery::new("100000015", WorksQuery::new().query("ontologies"));
+///
+/// ```
+/// Is equal to create a `WorksIdentQuery` from a `WorksQuery`
+///
+/// ```edition2018
+/// use crossref::WorksQuery;
+///
+/// let combined = WorksQuery::new().query("ontologies").into_ident("100000015");
+///
 /// ```
 /// helper struct to capture an id for a `Component` other than `/works` and an additional query for the `/works` route
-// TODO rename `WorksIdent`?
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorksCombined {
-    /// the id of an component item other than `Component::Works`
+pub struct WorksIdentQuery {
+    /// the id of an component item
     pub id: String,
     /// the query to filter the works results
     pub query: WorksQuery,
 }
 
-impl WorksCombined {
-    /// create a WorksCombined instance
-    pub fn new(id: &str, query: WorksQuery) -> Self {
-        WorksCombined {
-            id: id.to_string(),
+impl WorksIdentQuery {
+    pub fn new<T: Into<String>>(id: T, query: WorksQuery) -> Self {
+        WorksIdentQuery {
+            id: id.into(),
             query,
         }
     }
 }
+
+pub trait WorksCombiner {
+    fn primary_component() -> Component;
+
+    fn as_combined(ident: WorksIdentQuery) -> Self;
+
+    fn combined_route(ident: &WorksIdentQuery) -> Result<String> {
+        let query = ident.query.route()?;
+        if query.is_empty() {
+            Ok(format!(
+                "{}/{}/{}",
+                Self::primary_component().route()?,
+                ident.id,
+                Component::Works.route()?
+            ))
+        } else {
+            Ok(format!(
+                "{}/{}/{}?{}",
+                Self::primary_component().route()?,
+                ident.id,
+                Component::Works.route()?,
+                query
+            ))
+        }
+    }
+}
+
+macro_rules! impl_combiner {
+    ($($name:ident,)*) => {
+        $(
+        impl WorksCombiner for $name {
+            fn primary_component() -> Component {
+                Component::$name
+            }
+
+            fn as_combined(ident: WorksIdentQuery) -> Self {
+                $name::Works(ident)
+            }
+        }
+        )+
+    };
+}
+
+impl_combiner!(Journals, Funders, Members, Prefixes, Types,);
 
 impl WorksQuery {
     /// alias for creating an empty default element
@@ -642,11 +684,21 @@ impl WorksQuery {
         self
     }
 
-    // TODO impl methods to construct a `WorksComponent` from the query, either by taking a special trait
+    /// Wrap the query in a combined query
     ///
-    // fail on unsupported route or take a trait?
-    pub fn into_combined<T: Into<String>>(self, component: Component, id: T) -> WorksComponent {
-        unimplemented!()
+    /// # Example
+    /// Create a Funders Query that targets all works of a funder if
+    ///
+    /// ```edition2018
+    /// # use crossref::{WorksQuery, Funders};
+    /// let funders_query: Funders = WorksQuery::new().into_combined("funder_id");
+    /// ```
+    pub fn into_combined<W: WorksCombiner>(self, id: &str) -> W {
+        W::as_combined(self.into_ident(id))
+    }
+
+    pub fn into_ident(self, id: &str) -> WorksIdentQuery {
+        WorksIdentQuery::new(id, self)
     }
 }
 

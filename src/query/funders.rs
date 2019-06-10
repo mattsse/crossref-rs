@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::query::facet::FacetCount;
-use crate::query::works::{WorksCombined, WorksFilter, WorksQuery};
+use crate::query::works::{WorksCombiner, WorksFilter, WorksIdentQuery, WorksQuery};
 use crate::query::*;
 use std::borrow::Cow;
 
@@ -44,7 +44,7 @@ pub enum Funders {
     /// target all funders that match the query at `/funders?query...`
     Query(FundersQuery),
     /// target a `Work` for a specific funder at `/funders/{id}/works?query..`
-    Works(WorksCombined),
+    Works(WorksIdentQuery),
 }
 
 impl CrossrefRoute for Funders {
@@ -59,25 +59,7 @@ impl CrossrefRoute for Funders {
                     Ok(format!("{}?{}", Component::Funders.route()?, query))
                 }
             }
-            Funders::Works(combined) => {
-                let query = combined.query.route()?;
-                if query.is_empty() {
-                    Ok(format!(
-                        "{}/{}/{}",
-                        Component::Funders.route()?,
-                        combined.id,
-                        Component::Works.route()?
-                    ))
-                } else {
-                    Ok(format!(
-                        "{}/{}/{}?{}",
-                        Component::Funders.route()?,
-                        combined.id,
-                        Component::Works.route()?,
-                        query
-                    ))
-                }
-            }
+            Funders::Works(combined) => Self::combined_route(combined),
         }
     }
 }

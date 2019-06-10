@@ -94,7 +94,7 @@
 //!     /// target all members that match the query at `/members?query...`
 //!     Query(MembersQuery),
 //!     /// target a `Work` for a specific member at `/members/{id}/works?query..`
-//!     Works(WorksCombined),
+//!     Works(WorksIdentQuery),
 //! }
 //! ```
 //!
@@ -152,9 +152,9 @@
 //! # use crossref::*;
 //! # fn run() -> Result<()> {
 //! # let client = Crossref::builder().build()?;
-//! let works = client.member_works_query("member_id", WorksQuery::new()
+//! let works = client.member_works_query( WorksQuery::new()
 //! .query("machine learning")
-//! .sort(Sort::Score))?;
+//! .sort(Sort::Score).into_ident("member_id"))?;
 //! # Ok(())
 //! # }
 //! ```
@@ -210,11 +210,11 @@ pub use self::error::{Error, Result};
 
 #[doc(inline)]
 pub use self::query::works::{
-    FieldQuery, WorkResultControl, Works, WorksCombined, WorksFilter, WorksQuery,
+    FieldQuery, WorkResultControl, Works, WorksFilter, WorksIdentQuery, WorksQuery,
 };
 
 #[doc(inline)]
-pub use self::query::{CrossrefQuery, CrossrefRoute, Order, Sort};
+pub use self::query::{Component, CrossrefQuery, CrossrefRoute, Order, Sort};
 pub use self::query::{Funders, Journals, Members, Prefixes, Type, Types};
 pub use self::response::{
     CrossrefType, Funder, FunderList, Journal, JournalList, Member, MemberList, TypeList, Work,
@@ -248,17 +248,19 @@ macro_rules! get_item {
     };
 }
 
-// TODO macros or design overhaul?
 macro_rules! impl_query {
     ($($name:ident  $component:ident,)*) => {
-        $( /// Return one page of the components's `Work` that match the query
-        //TODO refactor to take a `WorksComponent`
-        pub fn $name(&self, id: &str, query: WorksQuery) -> Result<WorkList> {
-            let resp = self.get_response($component::Works(WorksCombined::new(id, query)))?;
+        $(
+        /// Return one page of the components's `Work` that match the query
+        ///
+        pub fn $name(&self, ident: WorksIdentQuery) -> Result<WorkList> {
+            let resp = self.get_response($component::Works(ident))?;
             get_item!(WorkList, resp.message, resp.message_type)
         })+
     };
 }
+
+// Worksquery.to_combined(type, id)--> ResourceComponent
 
 /// Struct for Crossref search API methods
 #[derive(Debug, Clone)]
@@ -272,15 +274,16 @@ pub struct Crossref {
 impl Crossref {
     const BASE_URL: &'static str = "https://api.crossref.org";
 
-    impl_query!(funder_works_query Funders, member_works_query Members,
-    type_works_query Types, journal_works_query Journals,);
-
     /// Constructs a new `CrossrefBuilder`.
     ///
     /// This is the same as `Crossref::builder()`.
     pub fn builder() -> CrossrefBuilder {
         CrossrefBuilder::new()
     }
+
+    // generate all functions to query combined endpoints
+    impl_query!(funder_works_query Funders, member_works_query Members,
+    type_works_query Types, journal_works_query Journals,);
 
     /// Transforms the `CrossrefQuery` in the request route and  executes the request
     ///
@@ -359,7 +362,6 @@ impl Crossref {
     /// Fails if anything else than a `WorkList` is returned as message `UnexpectedItem`
     pub fn works(&self, query: WorksQuery) -> Result<WorkList> {
         let resp = self.get_response(Works::Query(query))?;
-        // TODO add deep paging support
         get_item!(WorkList, resp.message, resp.message_type)
     }
 
@@ -433,10 +435,11 @@ impl Crossref {
 
     /// Return one page of the funder's `Work` that match the query
     pub fn funder_works(&self, funder_id: &str, term: &str) -> Result<WorkList> {
-        let resp = self.get_response(Funders::Works(WorksCombined::new(
-            funder_id,
-            WorksQuery::new().query(term),
-        )))?;
+        let resp = self.get_response(
+            WorksQuery::new()
+                .query(term)
+                .into_combined::<Funders>(funder_id),
+        )?;
         get_item!(WorkList, resp.message, resp.message_type)
     }
 
@@ -447,17 +450,18 @@ impl Crossref {
     }
 
     /// Return the `Member` for the `id`
-    pub fn member(&self, id: &str) -> Result<Member> {
-        let resp = self.get_response(Members::Identifier(id.to_string()))?;
+    pub fn member(&self, member_id: &str) -> Result<Member> {
+        let resp = self.get_response(Members::Identifier(member_id.to_string()))?;
         get_item!(Member, resp.message, resp.message_type).map(|x| *x)
     }
 
     /// Return one page of the member's `Work` that match the query
     pub fn member_works(&self, member_id: &str, term: &str) -> Result<WorkList> {
-        let resp = self.get_response(Members::Works(WorksCombined::new(
-            member_id,
-            WorksQuery::new().query(term),
-        )))?;
+        let resp = self.get_response(
+            WorksQuery::new()
+                .query(term)
+                .into_combined::<Members>(member_id),
+        )?;
         get_item!(WorkList, resp.message, resp.message_type)
     }
 
@@ -469,10 +473,11 @@ impl Crossref {
 
     /// Return one page of the prefix's `Work` items that match the query
     pub fn prefix_works(&self, prefix_id: &str, term: &str) -> Result<WorkList> {
-        let resp = self.get_response(Prefixes::Works(WorksCombined::new(
-            prefix_id,
-            WorksQuery::new().query(term),
-        )))?;
+        let resp = self.get_response(
+            WorksQuery::new()
+                .query(term)
+                .into_combined::<Prefixes>(prefix_id),
+        )?;
         get_item!(WorkList, resp.message, resp.message_type)
     }
 
@@ -490,10 +495,11 @@ impl Crossref {
 
     /// Return one page of the types's `Work` items that match the query
     pub fn type_works(&self, type_: Type, term: &str) -> Result<WorkList> {
-        let resp = self.get_response(Types::Works(WorksCombined::new(
-            type_.id(),
-            WorksQuery::new().query(term),
-        )))?;
+        let resp = self.get_response(
+            WorksQuery::new()
+                .query(term)
+                .into_combined::<Types>(type_.id()),
+        )?;
         get_item!(WorkList, resp.message, resp.message_type)
     }
 
