@@ -2,7 +2,7 @@
 
 use crate::error::Result;
 use crate::response::{FacetMap, QueryResponse};
-use crate::{Crossref, WorksQuery};
+use crate::{Crossref, WorkListQuery, WorksQuery};
 use chrono::NaiveDate;
 use serde_json::Value;
 
@@ -27,6 +27,9 @@ pub struct WorkList {
     pub items: Vec<Work>,
     /// deep page through `/works` result sets
     pub next_cursor: Option<String>,
+
+    #[serde(skip)]
+    pub work_query: Option<WorkListQuery>,
 }
 
 /// the main return type of the crossref api

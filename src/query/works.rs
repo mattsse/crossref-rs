@@ -476,14 +476,7 @@ impl CrossrefRoute for Works {
         match self {
             Works::Identifier(s) => Ok(format!("{}/{}", Component::Works.route()?, s)),
             Works::Agency(s) => Ok(format!("{}/{}/agency", Component::Works.route()?, s)),
-            Works::Query(query) => {
-                let query = query.route()?;
-                if query.is_empty() {
-                    Component::Works.route()
-                } else {
-                    Ok(format!("{}?{}", Component::Works.route()?, query))
-                }
-            }
+            Works::Query(query) => query.route(),
         }
     }
 }
@@ -494,12 +487,63 @@ impl CrossrefQuery for Works {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum WorkListQuery {
+    Works(WorksQuery),
+    Combined {
+        primary_component: Component,
+        ident: WorksIdentQuery,
+    },
+}
+
+impl Into<WorkListQuery> for WorksQuery {
+    fn into(self) -> WorkListQuery {
+        WorkListQuery::Works(self)
+    }
+}
+
+impl CrossrefRoute for WorkListQuery {
+    fn route(&self) -> Result<String> {
+        match self {
+            WorkListQuery::Works(query) => query.route(),
+            WorkListQuery::Combined {
+                primary_component,
+                ident,
+            } => Ok(format!(
+                "{}/{}{}",
+                primary_component.route()?,
+                ident.id,
+                ident.query.route()?
+            )),
+        }
+    }
+}
+
+impl CrossrefQuery for WorkListQuery {
+    fn resource_component(self) -> ResourceComponent {
+        match self {
+            WorkListQuery::Works(query) => ResourceComponent::Works(Works::Query(query)),
+            WorkListQuery::Combined {
+                primary_component,
+                ident,
+            } => match primary_component {
+                Component::Funders => ResourceComponent::Funders(Funders::Works(ident)),
+                Component::Journals => ResourceComponent::Journals(Journals::Works(ident)),
+                Component::Members => ResourceComponent::Members(Members::Works(ident)),
+                Component::Prefixes => ResourceComponent::Prefixes(Prefixes::Works(ident)),
+                Component::Types => ResourceComponent::Types(Types::Works(ident)),
+                Component::Works => ResourceComponent::Works(Works::Query(ident.query)),
+            },
+        }
+    }
+}
+
 /// Target `Works` as secondary resource component
 ///
 /// # Example
 ///
 /// ```edition2018
-/// use crossref::{WorksIdentQuery,WorksQuery};
+/// use crossref::{WorksIdentQuery, WorksQuery};
 ///
 /// let combined = WorksIdentQuery::new("100000015", WorksQuery::new().query("ontologies"));
 ///
@@ -533,25 +577,21 @@ impl WorksIdentQuery {
 pub trait WorksCombiner {
     fn primary_component() -> Component;
 
-    fn as_combined(ident: WorksIdentQuery) -> Self;
+    fn ident_query(ident: WorksIdentQuery) -> Self;
 
     fn combined_route(ident: &WorksIdentQuery) -> Result<String> {
-        let query = ident.query.route()?;
-        if query.is_empty() {
-            Ok(format!(
-                "{}/{}/{}",
-                Self::primary_component().route()?,
-                ident.id,
-                Component::Works.route()?
-            ))
-        } else {
-            Ok(format!(
-                "{}/{}/{}?{}",
-                Self::primary_component().route()?,
-                ident.id,
-                Component::Works.route()?,
-                query
-            ))
+        Ok(format!(
+            "{}/{}{}",
+            Self::primary_component().route()?,
+            ident.id,
+            ident.query.route()?
+        ))
+    }
+
+    fn work_list_query(ident: WorksIdentQuery) -> WorkListQuery {
+        WorkListQuery::Combined {
+            primary_component: Self::primary_component(),
+            ident,
         }
     }
 }
@@ -564,7 +604,7 @@ macro_rules! impl_combiner {
                 Component::$name
             }
 
-            fn as_combined(ident: WorksIdentQuery) -> Self {
+            fn ident_query(ident: WorksIdentQuery) -> Self {
                 $name::Works(ident)
             }
         }
@@ -694,7 +734,7 @@ impl WorksQuery {
     /// let funders_query: Funders = WorksQuery::new().into_combined("funder_id");
     /// ```
     pub fn into_combined<W: WorksCombiner>(self, id: &str) -> W {
-        W::as_combined(self.into_ident(id))
+        W::ident_query(self.into_ident(id))
     }
 
     pub fn into_ident(self, id: &str) -> WorksIdentQuery {
@@ -768,7 +808,11 @@ impl CrossrefRoute for WorksQuery {
             params.push(rc.param());
         }
 
-        Ok(params.join("&"))
+        Ok(format!(
+            "{}?{}",
+            Component::Works.route()?,
+            params.join("&")
+        ))
     }
 }
 

@@ -496,7 +496,7 @@ impl<T: CrossrefQueryParam> CrossrefRoute for dyn AsRef<[T]> {
 }
 
 /// root level trait to construct full crossref api request urls
-pub trait CrossrefQuery: CrossrefRoute {
+pub trait CrossrefQuery: CrossrefRoute + Clone {
     /// the resource component endpoint this route targets
     fn resource_component(self) -> ResourceComponent;
 

@@ -134,6 +134,7 @@ impl<'de> Deserialize<'de> for Response {
                 query: list_resp.query,
                 items,
                 next_cursor: list_resp.next_cursor,
+                work_query: None,
             }))
         }
 
@@ -322,6 +323,8 @@ pub struct QueryResponse {
     /// the terms that were initially set in the request query
     pub search_terms: Option<String>,
 }
+
+// TODO impl CrossrefRoute for QueryResponse
 
 /// facets are returned as map
 pub type FacetMap = HashMap<String, FacetItem>;
