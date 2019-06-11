@@ -596,10 +596,13 @@ impl WorksIdentQuery {
 }
 
 pub trait WorksCombiner {
+    /// the primary component of this type
     fn primary_component() -> Component;
 
+    /// construct a new type
     fn ident_query(ident: WorksIdentQuery) -> Self;
 
+    /// the combined crossref route
     fn combined_route(ident: &WorksIdentQuery) -> Result<String> {
         Ok(format!(
             "{}/{}{}",
@@ -609,6 +612,7 @@ pub trait WorksCombiner {
         ))
     }
 
+    /// create a new combined `WorkListQuery` with the primary component
     fn work_list_query(ident: WorksIdentQuery) -> WorkListQuery {
         WorkListQuery::Combined {
             primary_component: Self::primary_component(),
@@ -652,6 +656,11 @@ impl WorksQuery {
         WorksQuery::default()
     }
 
+    /// Convenience method to create a new `WorksQuery` with a term directly
+    pub fn new_query<T: ToString>(query: T) -> Self {
+        WorksQuery::new().query(query)
+    }
+
     /// add a new free form query
     pub fn sample(mut self, len: usize) -> Self {
         self.sample = Some(len);
@@ -659,7 +668,7 @@ impl WorksQuery {
     }
 
     /// add a new free form query
-    pub fn query(mut self, query: &str) -> Self {
+    pub fn query<T: ToString>(mut self, query: T) -> Self {
         self.free_form_queries.push(query.to_string());
         self
     }
@@ -745,24 +754,38 @@ impl WorksQuery {
         self
     }
 
-    /// Wrap the query in a combined query
+    /// Wrap the query in a combined query.
     ///
     /// # Example
-    /// Create a Funders Query that targets all works of a funder if
+    /// Create a Funders Query that targets all works of a funder with id `funder id`.
     ///
     /// ```edition2018
     /// # use crossref::{WorksQuery, Funders};
-    /// let funders_query: Funders = WorksQuery::new().into_combined("funder_id");
+    /// let funders: Funders = WorksQuery::new().into_combined("funder id");
     /// ```
     pub fn into_combined<W: WorksCombiner>(self, id: &str) -> W {
         W::ident_query(self.into_ident(id))
     }
 
+    /// Bind the query to a specific id of a primary endpoint element
     pub fn into_ident(self, id: &str) -> WorksIdentQuery {
         WorksIdentQuery::new(id, self)
     }
 
-    pub fn into_list_query<W: WorksCombiner>(self, id: &str) -> WorkListQuery {
+    /// wrap this query in new `WorkListQuery` that targets the `/works` route of a primary component with an id.
+    /// The query will evaluate to the same as [`into_combined`]
+    ///
+    /// # Example
+    ///
+    /// Create a query that targets all `Works` of a funder with id `funder id`
+    ///
+    /// ```edition2018
+    /// # use crossref::{WorksQuery, Funders};
+    /// let query = WorksQuery::new()
+    ///     .into_combined_query::<Funders>("funder id");
+    ///
+    /// ```
+    pub fn into_combined_query<W: WorksCombiner>(self, id: &str) -> WorkListQuery {
         W::work_list_query(self.into_ident(id))
     }
 }
