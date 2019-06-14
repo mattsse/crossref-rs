@@ -2,7 +2,7 @@
 
 use crate::error::Result;
 use crate::response::{FacetMap, QueryResponse};
-use crate::{Crossref, WorksQuery};
+use crate::{Crossref, WorkListQuery, WorksQuery};
 use chrono::NaiveDate;
 use serde_json::Value;
 
@@ -27,25 +27,6 @@ pub struct WorkList {
     pub items: Vec<Work>,
     /// deep page through `/works` result sets
     pub next_cursor: Option<String>,
-}
-
-/// Allows iterating of deep page work request
-pub struct WorkIterator<'a> {
-    /// the query for each request
-    // TODO support also other routes: WorksCombined + primary component
-    query: WorksQuery,
-    /// performs the request
-    client: &'a Crossref,
-    /// stores how many results already retrieved
-    index: usize,
-}
-
-impl<'a> Iterator for WorkIterator<'a> {
-    type Item = WorkList;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        unimplemented!()
-    }
 }
 
 /// the main return type of the crossref api
@@ -95,7 +76,8 @@ pub struct Work {
     pub date: Option<Date>,
     /// Date on which the work metadata was most recently updated
     pub deposited: Option<Date>,
-    /// the works crossref score
+    /// the score of the publication if any
+    /// not included in the crossrif api spec
     pub score: Option<f32>,
     /// Date on which the work metadata was most recently indexed.
     /// Re-indexing does not imply a metadata change, see `deposited` for the most recent metadata change date

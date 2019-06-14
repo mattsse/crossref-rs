@@ -409,6 +409,12 @@ impl WorkResultControl {
     }
 }
 
+impl Default for WorkResultControl {
+    fn default() -> Self {
+        WorkResultControl::new_cursor()
+    }
+}
+
 impl CrossrefQueryParam for WorkResultControl {
     fn param_key(&self) -> Cow<str> {
         match self {
@@ -476,14 +482,7 @@ impl CrossrefRoute for Works {
         match self {
             Works::Identifier(s) => Ok(format!("{}/{}", Component::Works.route()?, s)),
             Works::Agency(s) => Ok(format!("{}/{}/agency", Component::Works.route()?, s)),
-            Works::Query(query) => {
-                let query = query.route()?;
-                if query.is_empty() {
-                    Component::Works.route()
-                } else {
-                    Ok(format!("{}?{}", Component::Works.route()?, query))
-                }
-            }
+            Works::Query(query) => query.route(),
         }
     }
 }
@@ -493,66 +492,161 @@ impl CrossrefQuery for Works {
         ResourceComponent::Works(self)
     }
 }
+
+/// Wraps queries that target `WorkList`, either directly or combined
+#[derive(Debug, Clone)]
+#[allow(missing_docs)]
+pub enum WorkListQuery {
+    /// Target `Works` directly
+    Works(WorksQuery),
+    /// Target the corresponding `Works` of a specific `Component`
+    Combined {
+        primary_component: Component,
+        ident: WorksIdentQuery,
+    },
+}
+
+impl WorkListQuery {
+    /// the underlying `WorksQuery`
+    pub fn query(&self) -> &WorksQuery {
+        match self {
+            WorkListQuery::Works(query) => query,
+            WorkListQuery::Combined { ident, .. } => &ident.query,
+        }
+    }
+
+    /// mut reference to the underlying `Worksquery`
+    pub fn query_mut(&mut self) -> &mut WorksQuery {
+        match self {
+            WorkListQuery::Works(query) => query,
+            WorkListQuery::Combined { ident, .. } => &mut ident.query,
+        }
+    }
+}
+
+impl Into<WorkListQuery> for WorksQuery {
+    fn into(self) -> WorkListQuery {
+        WorkListQuery::Works(self)
+    }
+}
+
+impl CrossrefRoute for WorkListQuery {
+    fn route(&self) -> Result<String> {
+        match self {
+            WorkListQuery::Works(query) => query.route(),
+            WorkListQuery::Combined {
+                primary_component,
+                ident,
+            } => Ok(format!(
+                "{}/{}{}",
+                primary_component.route()?,
+                ident.id,
+                ident.query.route()?
+            )),
+        }
+    }
+}
+
+impl CrossrefQuery for WorkListQuery {
+    fn resource_component(self) -> ResourceComponent {
+        match self {
+            WorkListQuery::Works(query) => ResourceComponent::Works(Works::Query(query)),
+            WorkListQuery::Combined {
+                primary_component,
+                ident,
+            } => match primary_component {
+                Component::Funders => ResourceComponent::Funders(Funders::Works(ident)),
+                Component::Journals => ResourceComponent::Journals(Journals::Works(ident)),
+                Component::Members => ResourceComponent::Members(Members::Works(ident)),
+                Component::Prefixes => ResourceComponent::Prefixes(Prefixes::Works(ident)),
+                Component::Types => ResourceComponent::Types(Types::Works(ident)),
+                Component::Works => ResourceComponent::Works(Works::Query(ident.query)),
+            },
+        }
+    }
+}
+
 /// Target `Works` as secondary resource component
 ///
 /// # Example
 ///
 /// ```edition2018
-/// use crossref::{WorksCombined,WorksQuery};
+/// use crossref::{WorksIdentQuery, WorksQuery};
 ///
-/// let combined = WorksCombined::new("100000015", WorksQuery::new().query("ontologies"));
+/// let combined = WorksIdentQuery::new("100000015", WorksQuery::new().query("ontologies"));
+///
 /// ```
-/// helper struct to capture an id for a [Component] other than `/works` and an additional query for the `/works` route
+/// Is equal to create a `WorksIdentQuery` from a `WorksQuery`
+///
+/// ```edition2018
+/// use crossref::WorksQuery;
+///
+/// let combined = WorksQuery::new().query("ontologies").into_ident("100000015");
+///
+/// ```
+/// helper struct to capture an id for a `Component` other than `/works` and an additional query for the `/works` route
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorksCombined {
-    /// the id of an component item other than `Component::Works`
+pub struct WorksIdentQuery {
+    /// the id of an component item
     pub id: String,
     /// the query to filter the works results
     pub query: WorksQuery,
 }
 
-impl WorksCombined {
-    /// create a WorksCombined instance
-    pub fn new(id: &str, query: WorksQuery) -> Self {
-        WorksCombined {
-            id: id.to_string(),
+impl WorksIdentQuery {
+    /// create a new Ident Query for the `id`
+    pub fn new<T: Into<String>>(id: T, query: WorksQuery) -> Self {
+        WorksIdentQuery {
+            id: id.into(),
             query,
         }
     }
 }
 
-/// Used to construct a query that targets crossref `Works` elements
-///
-/// # Example
-///
-/// ```edition2018
-/// use crossref::{Order, WorksQuery};
-///
-/// // create a new query for topcis machine+learning ordered desc
-/// let query = WorksQuery::new().query("machine learning").order(Order::Desc);
-/// ```
-///
-/// Each query parameter is ANDed
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct WorksQuery {
-    /// search by non specific query
-    pub free_form_queries: Vec<String>,
-    /// match only particular fields of metadata
-    pub field_queries: Vec<FieldQuery>,
-    /// filter to apply while querying
-    pub filter: Vec<WorksFilter>,
-    /// sort results by a certain field and
-    pub sort: Option<Sort>,
-    /// set the sort order to `asc` or `desc`
-    pub order: Option<Order>,
-    /// enable facet information in responses
-    pub facets: Vec<FacetCount>,
-    /// deep page through `/works` result sets
-    pub result_control: Option<WorkResultControl>,
-    /// request random dois
-    /// if set all other parameters are ignored
-    pub sample: Option<usize>,
+/// Trait to determine that the type can be used in a combined query
+pub trait WorksCombiner {
+    /// the primary component of this type
+    fn primary_component() -> Component;
+
+    /// construct a new type
+    fn ident_query(ident: WorksIdentQuery) -> Self;
+
+    /// the combined crossref route
+    fn combined_route(ident: &WorksIdentQuery) -> Result<String> {
+        Ok(format!(
+            "{}/{}{}",
+            Self::primary_component().route()?,
+            ident.id,
+            ident.query.route()?
+        ))
+    }
+
+    /// create a new combined `WorkListQuery` with the primary component
+    fn work_list_query(ident: WorksIdentQuery) -> WorkListQuery {
+        WorkListQuery::Combined {
+            primary_component: Self::primary_component(),
+            ident,
+        }
+    }
 }
+
+macro_rules! impl_combiner {
+    ($($name:ident,)*) => {
+        $(
+        impl WorksCombiner for $name {
+            fn primary_component() -> Component {
+                Component::$name
+            }
+
+            fn ident_query(ident: WorksIdentQuery) -> Self {
+                $name::Works(ident)
+            }
+        }
+        )+
+    };
+}
+
+impl_combiner!(Journals, Funders, Members, Prefixes, Types,);
 
 impl WorksQuery {
     /// alias for creating an empty default element
@@ -571,16 +665,23 @@ impl WorksQuery {
         WorksQuery::default()
     }
 
+    /// Convenience method to create a new `WorksQuery` with a term directly
+    pub fn new_query<T: ToString>(query: T) -> Self {
+        WorksQuery::new().query(query)
+    }
+
     /// add a new free form query
     pub fn sample(mut self, len: usize) -> Self {
         self.sample = Some(len);
         self
     }
+
     /// add a new free form query
-    pub fn query(mut self, query: &str) -> Self {
+    pub fn query<T: ToString>(mut self, query: T) -> Self {
         self.free_form_queries.push(query.to_string());
         self
     }
+
     /// Create a new query for the topics renear+ontologies
     ///
     /// # Example
@@ -661,6 +762,74 @@ impl WorksQuery {
         self.result_control = Some(result_control);
         self
     }
+
+    /// Wrap the query in a combined query.
+    ///
+    /// # Example
+    /// Create a Funders Query that targets all works of a funder with id `funder id`.
+    ///
+    /// ```edition2018
+    /// # use crossref::{WorksQuery, Funders};
+    /// let funders: Funders = WorksQuery::new().into_combined("funder id");
+    /// ```
+    pub fn into_combined<W: WorksCombiner>(self, id: &str) -> W {
+        W::ident_query(self.into_ident(id))
+    }
+
+    /// Bind the query to a specific id of a primary endpoint element
+    pub fn into_ident(self, id: &str) -> WorksIdentQuery {
+        WorksIdentQuery::new(id, self)
+    }
+
+    /// wrap this query in new `WorkListQuery` that targets the `/works` route of a primary component with an id.
+    /// The query will evaluate to the same as [`into_combined`]
+    ///
+    /// # Example
+    ///
+    /// Create a query that targets all `Works` of a funder with id `funder id`
+    ///
+    /// ```edition2018
+    /// # use crossref::{WorksQuery, Funders};
+    /// let query = WorksQuery::new()
+    ///     .into_combined_query::<Funders>("funder id");
+    ///
+    /// ```
+    pub fn into_combined_query<W: WorksCombiner>(self, id: &str) -> WorkListQuery {
+        W::work_list_query(self.into_ident(id))
+    }
+}
+
+/// Used to construct a query that targets crossref `Works` elements
+///
+/// # Example
+///
+/// ```edition2018
+/// use crossref::{Order, WorksQuery};
+///
+/// // create a new query for topcis machine+learning ordered desc
+/// let query = WorksQuery::new().query("machine learning").order(Order::Desc);
+/// ```
+///
+/// Each query parameter is ANDed
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WorksQuery {
+    /// search by non specific query
+    pub free_form_queries: Vec<String>,
+    /// match only particular fields of metadata
+    pub field_queries: Vec<FieldQuery>,
+    /// filter to apply while querying
+    pub filter: Vec<WorksFilter>,
+    /// sort results by a certain field and
+    pub sort: Option<Sort>,
+    /// set the sort order to `asc` or `desc`
+    pub order: Option<Order>,
+    /// enable facet information in responses
+    pub facets: Vec<FacetCount>,
+    /// deep page through `/works` result sets
+    pub result_control: Option<WorkResultControl>,
+    /// request random dois
+    /// if set all other parameters are ignored
+    pub sample: Option<usize>,
 }
 
 impl CrossrefRoute for WorksQuery {
@@ -696,7 +865,11 @@ impl CrossrefRoute for WorksQuery {
             params.push(rc.param());
         }
 
-        Ok(params.join("&"))
+        Ok(format!(
+            "{}?{}",
+            Component::Works.route()?,
+            params.join("&")
+        ))
     }
 }
 

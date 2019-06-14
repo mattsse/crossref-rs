@@ -89,7 +89,7 @@ pub enum Members {
     /// target all members that match the query at `/members?query...`
     Query(MembersQuery),
     /// target a `Work` for a specific member at `/members/{id}/works?query..`
-    Works(WorksCombined),
+    Works(WorksIdentQuery),
 }
 ```
 

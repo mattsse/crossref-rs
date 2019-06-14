@@ -61,8 +61,7 @@
 //! ```edition2018
 //! # use crossref::*;
 //! # fn run() -> Result<()> {
-//! let query = WorksQuery::new()
-//! .query("Machine Learning")
+//! let query = WorksQuery::new_query("Machine Learning")
 //! // field queries supported for `Works`
 //! .field_query(FieldQuery::author("Some Author"))
 //! // filters are specific for each resource component
@@ -94,7 +93,7 @@
 //!     /// target all members that match the query at `/members?query...`
 //!     Query(MembersQuery),
 //!     /// target a `Work` for a specific member at `/members/{id}/works?query..`
-//!     Works(WorksCombined),
+//!     Works(WorksIdentQuery),
 //! }
 //! ```
 //!
@@ -125,7 +124,7 @@
 //! # use crossref::*;
 //! # fn run() -> Result<()> {
 //! # let client = Crossref::builder().build()?;
-//! let query = WorksQuery::new().query("Machine Learning");
+//! let query = WorksQuery::new_query("Machine Learning");
 //!
 //! // one page of the matching results
 //! let works = client.works(query)?;
@@ -152,42 +151,47 @@
 //! # use crossref::*;
 //! # fn run() -> Result<()> {
 //! # let client = Crossref::builder().build()?;
-//! let works = client.member_works_query("member_id", WorksQuery::new()
+//! let works = client.member_works( WorksQuery::new()
 //! .query("machine learning")
-//! .sort(Sort::Score))?;
+//! .sort(Sort::Score).into_ident("member_id"))?;
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! Convenience method to append works query term:
+//! ** Deep paging for `Works` **
+//! [Deep paging results](https://github.com/CrossRef/rest-api-doc#deep-paging-with-cursors)
+//! Deep paging is supported for all queries, that return a list of `Work`, `WorkList`.
+//! This function returns a new iterator over all available `Work`.
+//!
+//! # Example
+//!
+//! Iterate over all `Works` linked to search term `Machine Learning`
 //!
 //! ```edition2018
-//! # use crossref::*;
-//! # fn run() -> Result<()> {
-//! # let client = Crossref::builder().build()?;
-//! let works = client.member_works("member id", "Machine Learning")?;
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! **Deep paging for Works**
-//! ```edition2018
-//! use crossref::{Crossref, WorksQuery, WorksFilter};
+//! use crossref::{Crossref, WorksQuery, Work};
 //! # fn run() -> Result<(), crossref::Error> {
 //! let client = Crossref::builder().build()?;
 //!
-//! // request a next-cursor first
-//! let query = WorksQuery::new()
-//!     .query("Machine Learning")
-//!     .new_cursor();
+//! let all_works: Vec<Work> = client.deep_page(WorksQuery::new_query("Machine Learning")).flat_map(|x|x.items).collect();
 //!
-//! let works = client.works(query.clone())?;
 //! # Ok(())
 //! # }
 //! ```
 //!
+//! # Example
 //!
-//#![deny(warnings)]
+//! Iterate over all `Works` of the funder with id `funder id` by using a combined query
+//! ```edition2018
+//! use crossref::{Crossref, Funders, WorksQuery, Work};
+//! # fn run() -> Result<(), crossref::Error> {
+//! let client = Crossref::builder().build()?;
+//!
+//! let all_works: Vec<Work> = client.deep_page(WorksQuery::new().into_combined_query::<Funders>("funder id")).flat_map(|x|x.items).collect();
+//!
+//! # Ok(())
+//! # }
+//! ```
+#![deny(warnings)]
 #![deny(missing_docs)]
 #![allow(unused)]
 #[macro_use]
@@ -205,22 +209,17 @@ pub mod cn;
 /// textual data mining
 pub mod tdm;
 
-/// an async client
-#[cfg(feature = "client")]
-pub mod client;
-
 #[doc(inline)]
 pub use self::error::{Error, Result};
 
 #[doc(inline)]
 pub use self::query::works::{
-    FieldQuery, WorkResultControl, Works, WorksCombined, WorksFilter, WorksQuery,
+    FieldQuery, WorkListQuery, WorkResultControl, Works, WorksFilter, WorksIdentQuery, WorksQuery,
 };
+
 #[doc(inline)]
-pub use self::query::{CrossrefQuery, CrossrefRoute, Order, Sort};
-
+pub use self::query::{Component, CrossrefQuery, CrossrefRoute, Order, Sort};
 pub use self::query::{Funders, Journals, Members, Prefixes, Type, Types};
-
 pub use self::response::{
     CrossrefType, Funder, FunderList, Journal, JournalList, Member, MemberList, TypeList, Work,
     WorkAgency, WorkList,
@@ -229,7 +228,7 @@ pub use self::response::{
 pub(crate) use self::response::{Message, Response};
 
 use crate::error::ErrorKind;
-use crate::query::{FundersQuery, MembersQuery};
+use crate::query::{FundersQuery, MembersQuery, ResourceComponent};
 use crate::response::{MessageType, Prefix};
 use reqwest::{self, Client};
 
@@ -253,12 +252,13 @@ macro_rules! get_item {
     };
 }
 
-// TODO macros or design overhaul?
-macro_rules! impl_query {
+macro_rules! impl_combined_works_query {
     ($($name:ident  $component:ident,)*) => {
-        $( /// Return one page of the components's `Work` that match the query
-        pub fn $name(&self, id: &str, query: WorksQuery) -> Result<WorkList> {
-            let resp = self.get_response($component::Works(WorksCombined::new(id, query)))?;
+        $(
+        /// Return one page of the components's `Work` that match the query
+        ///
+        pub fn $name(&self, ident: WorksIdentQuery) -> Result<WorkList> {
+            let resp = self.get_response(&$component::Works(ident))?;
             get_item!(WorkList, resp.message, resp.message_type)
         })+
     };
@@ -276,15 +276,16 @@ pub struct Crossref {
 impl Crossref {
     const BASE_URL: &'static str = "https://api.crossref.org";
 
-    impl_query!(funder_works_query Funders, member_works_query Members,
-    type_works_query Types, journal_works_query Journals,);
-
     /// Constructs a new `CrossrefBuilder`.
     ///
     /// This is the same as `Crossref::builder()`.
     pub fn builder() -> CrossrefBuilder {
         CrossrefBuilder::new()
     }
+
+    // generate all functions to query combined endpoints
+    impl_combined_works_query!(funder_works Funders, member_works Members,
+    type_works Types, journal_works Journals, prefix_works Prefixes,);
 
     /// Transforms the `CrossrefQuery` in the request route and  executes the request
     ///
@@ -293,7 +294,7 @@ impl Crossref {
     /// If it was a bad url, the server will return `Resource not found` a `ResourceNotFound` error will be returned in this case
     /// Also fails if the json response body could be parsed into `Response`
     /// Fails if there was an error in reqwest executing the request [::reqwest::RequestBuilder::send]
-    fn get_response<T: CrossrefQuery>(&self, query: T) -> Result<Response> {
+    fn get_response<T: CrossrefQuery>(&self, query: &T) -> Result<Response> {
         let resp = self
             .client
             .get(&query.to_url(&self.base_url)?)
@@ -301,7 +302,7 @@ impl Crossref {
             .text()?;
         if resp.starts_with("Resource not found") {
             Err(ErrorKind::ResourceNotFound {
-                resource: Box::new(query.resource_component()),
+                resource: Box::new(query.clone().resource_component()),
             }
             .into())
         } else {
@@ -320,8 +321,7 @@ impl Crossref {
     /// # fn run() -> Result<(), crossref::Error> {
     /// let client = Crossref::builder().build()?;
     ///
-    /// let query = WorksQuery::new()
-    ///     .query("Machine Learning")
+    /// let query = WorksQuery::new_query("Machine Learning")
     ///     .filter(WorksFilter::HasOrcid)
     ///     .order(crossref::Order::Asc)
     ///     .field_query(FieldQuery::author("Some Author"))
@@ -333,7 +333,61 @@ impl Crossref {
     /// # }
     /// ```
     ///
+    /// # Errors
+    ///
+    /// This method fails if the `works` element expands to a bad route `ResourceNotFound`
+    /// Fails if the response body doesn't have `message` field `MissingMessage`.
+    /// Fails if anything else than a `WorkList` is returned as message `UnexpectedItem`
+    pub fn works<T: Into<WorkListQuery>>(&self, query: T) -> Result<WorkList> {
+        let resp = self.get_response(&query.into())?;
+        get_item!(WorkList, resp.message, resp.message_type)
+    }
+
+    /// Return the `Work` that is identified by  the `doi`.
+    ///
+    /// # Errors
+    /// This method fails if the doi could not identified `ResourceNotFound`
+    ///
+    pub fn work(&self, doi: &str) -> Result<Work> {
+        let resp = self.get_response(&Works::Identifier(doi.to_string()))?;
+        get_item!(Work, resp.message, resp.message_type).map(|x| *x)
+    }
+
     /// [Deep paging results](https://github.com/CrossRef/rest-api-doc#deep-paging-with-cursors)
+    /// Deep paging is supported for all queries, that return a list of `Work`, `WorkList`.
+    /// This function returns a new iterator over all available `Work`.
+    ///
+    /// # Example
+    ///
+    /// Iterate over all `Works` linked to search term `Machine Learning`
+    ///
+    /// ```edition2018
+    /// use crossref::{Crossref, WorksQuery, Work};
+    /// # fn run() -> Result<(), crossref::Error> {
+    /// let client = Crossref::builder().build()?;
+    ///
+    /// let all_works: Vec<Work> = client.deep_page(WorksQuery::new_query("Machine Learning")).flat_map(|x|x.items).collect();
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Example
+    ///
+    /// Iterate over all `Works` of the funder with id `funder id` by using a combined query
+    /// ```edition2018
+    /// use crossref::{Crossref, Funders, WorksQuery, Work};
+    /// # fn run() -> Result<(), crossref::Error> {
+    /// let client = Crossref::builder().build()?;
+    ///
+    /// let all_works: Vec<Work> = client.deep_page(WorksQuery::new().into_combined_query::<Funders>("funder id")).flat_map(|x|x.items).collect();
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// # Example
+    ///
+    /// Alternatively deep page without an iterator
     ///
     /// ```edition2018
     /// use crossref::{Crossref, WorksQuery, WorksFilter};
@@ -341,8 +395,7 @@ impl Crossref {
     /// let client = Crossref::builder().build()?;
     ///
     /// // request a next-cursor first
-    /// let query = WorksQuery::new()
-    ///     .query("Machine Learning")
+    /// let query = WorksQuery::new_query("Machine Learning")
     ///     .new_cursor();
     ///
     /// let works = client.works(query.clone())?;
@@ -356,25 +409,13 @@ impl Crossref {
     /// # }
     /// ```
     ///
-    /// # Errors
-    ///
-    /// This method fails if the `works` element expands to a bad route `ResourceNotFound`
-    /// Fails if the response body doesn't have `message` field `MissingMessage`.
-    /// Fails if anything else than a `WorkList` is returned as message `UnexpectedItem`
-    pub fn works(&self, query: WorksQuery) -> Result<WorkList> {
-        let resp = self.get_response(Works::Query(query))?;
-        // TODO add deep paging support
-        get_item!(WorkList, resp.message, resp.message_type)
-    }
-
-    /// Return the `Work` that is identified by  the `doi`.
-    ///
-    /// # Errors
-    /// This method fails if the doi could not identified `ResourceNotFound`
-    ///
-    pub fn work(&self, doi: &str) -> Result<Work> {
-        let resp = self.get_response(Works::Identifier(doi.to_string()))?;
-        get_item!(Work, resp.message, resp.message_type).map(|x| *x)
+    pub fn deep_page<T: Into<WorkListQuery>>(&self, query: T) -> WorkListIterator {
+        WorkListIterator {
+            query: query.into(),
+            client: self,
+            index: 0,
+            finish_next_iteration: false,
+        }
     }
 
     /// Return the `Agency` that registers the `Work` identified by  the `doi`.
@@ -383,7 +424,7 @@ impl Crossref {
     /// This method fails if the doi could not identified `ResourceNotFound`
     ///
     pub fn work_agency(&self, doi: &str) -> Result<WorkAgency> {
-        let resp = self.get_response(Works::Agency(doi.to_string()))?;
+        let resp = self.get_response(&Works::Agency(doi.to_string()))?;
         get_item!(WorkAgency, resp.message, resp.message_type)
     }
 
@@ -419,80 +460,44 @@ impl Crossref {
 
     /// Return the matching `Funders` items.
     pub fn funders(&self, funders: FundersQuery) -> Result<FunderList> {
-        let resp = self.get_response(Funders::Query(funders))?;
+        let resp = self.get_response(&Funders::Query(funders))?;
         get_item!(FunderList, resp.message, resp.message_type)
     }
 
     /// Return the `Funder` for the `id`
     pub fn funder(&self, id: &str) -> Result<Funder> {
-        let resp = self.get_response(Funders::Identifier(id.to_string()))?;
+        let resp = self.get_response(&Funders::Identifier(id.to_string()))?;
         get_item!(Funder, resp.message, resp.message_type).map(|x| *x)
-    }
-
-    /// Return one page of the funder's `Work` that match the query
-    pub fn funder_works(&self, funder_id: &str, term: &str) -> Result<WorkList> {
-        let resp = self.get_response(Funders::Works(WorksCombined::new(
-            funder_id,
-            WorksQuery::new().query(term),
-        )))?;
-        get_item!(WorkList, resp.message, resp.message_type)
     }
 
     /// Return the matching `Members` items.
     pub fn members(&self, members: MembersQuery) -> Result<MemberList> {
-        let resp = self.get_response(Members::Query(members))?;
+        let resp = self.get_response(&Members::Query(members))?;
         get_item!(MemberList, resp.message, resp.message_type)
     }
 
     /// Return the `Member` for the `id`
-    pub fn member(&self, id: &str) -> Result<Member> {
-        let resp = self.get_response(Members::Identifier(id.to_string()))?;
+    pub fn member(&self, member_id: &str) -> Result<Member> {
+        let resp = self.get_response(&Members::Identifier(member_id.to_string()))?;
         get_item!(Member, resp.message, resp.message_type).map(|x| *x)
-    }
-
-    /// Return one page of the member's `Work` that match the query
-    pub fn member_works(&self, member_id: &str, term: &str) -> Result<WorkList> {
-        let resp = self.get_response(Members::Works(WorksCombined::new(
-            member_id,
-            WorksQuery::new().query(term),
-        )))?;
-        get_item!(WorkList, resp.message, resp.message_type)
     }
 
     /// Return the `Prefix` for the `id`
     pub fn prefix(&self, id: &str) -> Result<Prefix> {
-        let resp = self.get_response(Prefixes::Identifier(id.to_string()))?;
+        let resp = self.get_response(&Prefixes::Identifier(id.to_string()))?;
         get_item!(Prefix, resp.message, resp.message_type)
-    }
-
-    /// Return one page of the prefix's `Work` items that match the query
-    pub fn prefix_works(&self, prefix_id: &str, term: &str) -> Result<WorkList> {
-        let resp = self.get_response(Prefixes::Works(WorksCombined::new(
-            prefix_id,
-            WorksQuery::new().query(term),
-        )))?;
-        get_item!(WorkList, resp.message, resp.message_type)
     }
 
     /// Return all available `Type`
     pub fn types(&self) -> Result<TypeList> {
-        let resp = self.get_response(Types::All)?;
+        let resp = self.get_response(&Types::All)?;
         get_item!(TypeList, resp.message, resp.message_type)
     }
 
     /// Return the `Type` for the `id`
     pub fn type_(&self, id: &str) -> Result<CrossrefType> {
-        let resp = self.get_response(Types::Identifier(id.to_string()))?;
+        let resp = self.get_response(&Types::Identifier(id.to_string()))?;
         get_item!(Type, resp.message, resp.message_type)
-    }
-
-    /// Return one page of the types's `Work` items that match the query
-    pub fn type_works(&self, type_: Type, term: &str) -> Result<WorkList> {
-        let resp = self.get_response(Types::Works(WorksCombined::new(
-            type_.id(),
-            WorksQuery::new().query(term),
-        )))?;
-        get_item!(WorkList, resp.message, resp.message_type)
     }
 
     /// Get a random set of DOIs
@@ -607,5 +612,71 @@ impl CrossrefBuilder {
                 .unwrap_or_else(|| Crossref::BASE_URL.to_string()),
             client,
         })
+    }
+}
+
+/// Allows iterating of deep page work request
+pub struct WorkListIterator<'a> {
+    /// the query
+    query: WorkListQuery,
+    /// performs each request
+    client: &'a Crossref,
+    /// stores how many results already retrieved
+    index: usize,
+    /// whether the iterator should finish next iteration
+    finish_next_iteration: bool,
+}
+
+impl<'a> Iterator for WorkListIterator<'a> {
+    type Item = WorkList;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.finish_next_iteration {
+            return None;
+        }
+
+        {
+            let control = &mut self.query.query_mut().result_control;
+
+            // if no result control is set, set a new cursor
+            if control.is_none() {
+                *control = Some(WorkResultControl::new_cursor());
+            }
+        }
+
+        let resp = self.client.get_response(&self.query);
+        if let Ok(resp) = resp {
+            let worklist: Result<WorkList> = get_item!(WorkList, resp.message, resp.message_type);
+            if let Ok(worklist) = worklist {
+                if let Some(cursor) = &worklist.next_cursor {
+                    match &mut self.query.query_mut().result_control {
+                        Some(WorkResultControl::Cursor { token, .. }) => {
+                            // use the received cursor token in next iteration
+                            *token = Some(cursor.clone())
+                        }
+                        Some(WorkResultControl::Standard(_)) => {
+                            // standard result control was set, don't deep page and return next iteration
+                            self.finish_next_iteration = true;
+                        }
+                        _ => (),
+                    }
+                } else {
+                    // no cursor received, end next iteration
+                    self.finish_next_iteration = true;
+                }
+
+                if worklist.items.is_empty() {
+                    None
+                } else {
+                    Some(worklist)
+                }
+            } else {
+                // failed to deserialize response into `WorkList`
+                None
+            }
+        } else {
+            // no response received
+            None
+        }
     }
 }

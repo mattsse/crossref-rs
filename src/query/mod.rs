@@ -6,7 +6,7 @@ pub use crate::query::members::{Members, MembersQuery};
 pub use crate::query::prefixes::Prefixes;
 pub use crate::query::types::{Type, Types};
 use crate::query::works::{Works, WorksFilter};
-pub use crate::query::works::{WorksCombined, WorksQuery};
+pub use crate::query::works::{WorksIdentQuery, WorksQuery};
 use chrono::NaiveDate;
 use core::fmt::Debug;
 use serde::Serialize;
@@ -30,8 +30,6 @@ pub trait CrossrefParams {
     /// the configured result control, if any
     fn result_control(&self) -> Option<&ResultControl>;
 }
-
-// TODO extract Query impl into separate trait
 
 macro_rules! impl_common_query {
     ($i:ident, $filter:ident) => {
@@ -360,22 +358,7 @@ impl CrossrefRoute for Component {
     }
 }
 
-#[allow(missing_docs)]
-pub struct WorksRequest {
-    primary_component: Component,
-    query: WorksQuery,
-    id: Option<String>,
-}
-
-impl CrossrefRoute for WorksRequest {
-    fn route(&self) -> Result<String> {
-        unimplemented!()
-    }
-}
-
 /// bundles all available crossref api endpoints
-///
-///
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResourceComponent {
     /// returns a list of all works (journal articles, conference proceedings, books, components, etc), 20 per page
@@ -501,7 +484,7 @@ pub trait CrossrefRoute {
     fn route(&self) -> Result<String>;
 }
 
-impl<T: CrossrefQueryParam> CrossrefRoute for AsRef<[T]> {
+impl<T: CrossrefQueryParam> CrossrefRoute for dyn AsRef<[T]> {
     fn route(&self) -> Result<String> {
         Ok(self
             .as_ref()
@@ -513,7 +496,7 @@ impl<T: CrossrefQueryParam> CrossrefRoute for AsRef<[T]> {
 }
 
 /// root level trait to construct full crossref api request urls
-pub trait CrossrefQuery: CrossrefRoute {
+pub trait CrossrefQuery: CrossrefRoute + Clone {
     /// the resource component endpoint this route targets
     fn resource_component(self) -> ResourceComponent;
 
@@ -521,10 +504,6 @@ pub trait CrossrefQuery: CrossrefRoute {
     fn to_url(&self, base_path: &str) -> Result<String> {
         Ok(format!("{}{}", base_path, self.route()?))
     }
-
-    //    fn to_json(&self) -> Result<Value> {
-    //        unimplemented!()
-    //    }
 }
 
 /// formats the topic for crossref by replacing all whitespaces whit `+`

@@ -323,6 +323,8 @@ pub struct QueryResponse {
     pub search_terms: Option<String>,
 }
 
+// TODO impl CrossrefRoute for QueryResponse
+
 /// facets are returned as map
 pub type FacetMap = HashMap<String, FacetItem>;
 
@@ -630,5 +632,13 @@ mod tests {
         let failure: Response = from_str(failure_str).unwrap();
 
         assert!(failure.is_validation_failure());
+    }
+
+    #[test]
+    fn work_msg_deserialize() {
+        let failure_str = r#"{"status":"ok","message-type":"work","message-version":"1.0.0","message":{"indexed":{"date-parts":[[2019,2,14]],"date-time":"2019-02-14T05:10:15Z","timestamp":1550121015066},"reference-count":105,"publisher":"American Psychological Association (APA)","issue":"1","content-domain":{"domain":[],"crossmark-restriction":false},"short-container-title":["American Psychologist"],"DOI":"10.1037\/0003-066x.59.1.29","type":"journal-article","created":{"date-parts":[[2004,1,21]],"date-time":"2004-01-21T14:31:19Z","timestamp":1074695479000},"page":"29-40","source":"Crossref","is-referenced-by-count":83,"title":["How the Mind Hurts and Heals the Body."],"prefix":"10.1037","volume":"59","author":[{"given":"Oakley","family":"Ray","sequence":"first","affiliation":[]}],"member":"15","published-online":{"date-parts":[[2004]]},"container-title":["American Psychologist"],"original-title":[],"language":"en","link":[{"URL":"http:\/\/psycnet.apa.org\/journals\/amp\/59\/1\/29.pdf","content-type":"unspecified","content-version":"vor","intended-application":"similarity-checking"}],"deposited":{"date-parts":[[2018,4,8]],"date-time":"2018-04-08T18:56:17Z","timestamp":1523213777000},"score":1.0,"subtitle":[],"short-title":[],"issued":{"date-parts":[[2004]]},"references-count":105,"journal-issue":{"published-online":{"date-parts":[[2004]]},"issue":"1"},"alternative-id":["2004-10043-004","14736318"],"URL":"http:\/\/dx.doi.org\/10.1037\/0003-066x.59.1.29","relation":{},"ISSN":["1935-990X","0003-066X"],"issn-type":[{"value":"0003-066X","type":"print"},{"value":"1935-990X","type":"electronic"}]}}"#;
+        let work: Response = from_str(failure_str).unwrap();
+
+        assert!(work.is_work());
     }
 }

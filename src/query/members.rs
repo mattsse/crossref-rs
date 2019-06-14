@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::query::works::{WorksCombined, WorksFilter, WorksQuery};
+use crate::query::works::{WorksCombiner, WorksFilter, WorksIdentQuery, WorksQuery};
 use crate::query::*;
 use std::borrow::Cow;
 
@@ -56,7 +56,7 @@ pub enum Members {
     /// target all members that match the query at `/members?query...`
     Query(MembersQuery),
     /// target a `Work` for a specific funder at `/members/{id}/works?query..`
-    Works(WorksCombined),
+    Works(WorksIdentQuery),
 }
 
 impl CrossrefRoute for Members {
@@ -71,25 +71,7 @@ impl CrossrefRoute for Members {
                     Ok(format!("{}?{}", Component::Members.route()?, query))
                 }
             }
-            Members::Works(combined) => {
-                let query = combined.query.route()?;
-                if query.is_empty() {
-                    Ok(format!(
-                        "{}/{}/{}",
-                        Component::Members.route()?,
-                        combined.id,
-                        Component::Works.route()?
-                    ))
-                } else {
-                    Ok(format!(
-                        "{}/{}/{}?{}",
-                        Component::Members.route()?,
-                        combined.id,
-                        Component::Works.route()?,
-                        query
-                    ))
-                }
-            }
+            Members::Works(combined) => Self::combined_route(combined),
         }
     }
 }

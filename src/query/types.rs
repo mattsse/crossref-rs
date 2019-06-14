@@ -1,5 +1,5 @@
 use crate::error::{Error, ErrorKind, Result};
-use crate::query::works::{WorksCombined, WorksFilter, WorksQuery};
+use crate::query::works::{WorksCombiner, WorksFilter, WorksIdentQuery, WorksQuery};
 use crate::query::{Component, CrossrefQuery, CrossrefRoute, ResourceComponent};
 use std::str::FromStr;
 
@@ -156,7 +156,7 @@ pub enum Types {
     /// target a specific type at `/types/{id}`
     Identifier(String),
     /// target a `Work` for a specific type at `/types/{id}/works?query..`
-    Works(WorksCombined),
+    Works(WorksIdentQuery),
 }
 
 impl CrossrefRoute for Types {
@@ -164,25 +164,7 @@ impl CrossrefRoute for Types {
         match self {
             Types::All => Component::Types.route(),
             Types::Identifier(s) => Ok(format!("{}/{}", Component::Types.route()?, s)),
-            Types::Works(combined) => {
-                let query = combined.query.route()?;
-                if query.is_empty() {
-                    Ok(format!(
-                        "{}/{}/{}",
-                        Component::Types.route()?,
-                        combined.id,
-                        Component::Works.route()?
-                    ))
-                } else {
-                    Ok(format!(
-                        "{}/{}/{}?{}",
-                        Component::Types.route()?,
-                        combined.id,
-                        Component::Works.route()?,
-                        query
-                    ))
-                }
-            }
+            Types::Works(combined) => Self::combined_route(combined),
         }
     }
 }
