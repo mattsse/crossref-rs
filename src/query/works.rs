@@ -493,9 +493,13 @@ impl CrossrefQuery for Works {
     }
 }
 
+/// Wraps queries that target `WorkList`, either directly or combined
 #[derive(Debug, Clone)]
+#[allow(missing_docs)]
 pub enum WorkListQuery {
+    /// Target `Works` directly
     Works(WorksQuery),
+    /// Target the corresponding `Works` of a specific `Component`
     Combined {
         primary_component: Component,
         ident: WorksIdentQuery,
@@ -503,12 +507,15 @@ pub enum WorkListQuery {
 }
 
 impl WorkListQuery {
+    /// the underlying `WorksQuery`
     pub fn query(&self) -> &WorksQuery {
         match self {
             WorkListQuery::Works(query) => query,
             WorkListQuery::Combined { ident, .. } => &ident.query,
         }
     }
+
+    /// mut reference to the underlying `Worksquery`
     pub fn query_mut(&mut self) -> &mut WorksQuery {
         match self {
             WorkListQuery::Works(query) => query,
@@ -587,6 +594,7 @@ pub struct WorksIdentQuery {
 }
 
 impl WorksIdentQuery {
+    /// create a new Ident Query for the `id`
     pub fn new<T: Into<String>>(id: T, query: WorksQuery) -> Self {
         WorksIdentQuery {
             id: id.into(),
@@ -595,6 +603,7 @@ impl WorksIdentQuery {
     }
 }
 
+/// Trait to determine that the type can be used in a combined query
 pub trait WorksCombiner {
     /// the primary component of this type
     fn primary_component() -> Component;
