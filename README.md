@@ -9,7 +9,6 @@ Crossref-rs - A rust client for the Crossref-API
 
 This client is inspired by [sckott/habanero](https://github.com/sckott/habanero/).
 
-This is still WIP.
 
 `Crossref` - Crossref search API. The `Crossref` crate provides methods matching Crossref API routes:
 
@@ -59,8 +58,7 @@ otherwise creating queries works the same for all resource components:
 
 ```rust
 
-let query = WorksQuery::new()
-    .query("Machine Learning")
+let query = WorksQuery::new("Machine Learning")
     // field queries supported for `Works`
     .field_query(FieldQuery::author("Some Author"))
     // filters are specific for each resource component
@@ -76,9 +74,9 @@ See [this table](https://github.com/CrossRef/rest-api-doc#resource-components) f
 
 There are 3 available targets:
 
-* **standalone resource components**: `/works`, `/members`, etc. that return a list list of the corresponding items and can be specified with queries
+* **standalone resource components**: `/works`, `/members`, `funders`, `prefixes`, `types` that return a list list of the corresponding items and can be specified with queries
 * **Resource component with identifiers**: `/works/{doi}?<query>`,`/members/{member_id}?<query>`, etc. that returns a single item if found.
-* **combined with the `works` route**: The works component can be appended to other resources: `/members/{member_id}/works?<query>` etc. that returns a list of matching `Work` items.
+* **combined with the `works` route**: The works component can be appended to other resources: `/members/{member_id}/works?<query>` etc. that returns a list of matching `Work` items as `WorkList`.
 
 This resembles in the enums of the resource components, eg. for `Members`:
 
@@ -93,10 +91,11 @@ pub enum Members {
 }
 ```
 
+### Examples
 
 All options are supported by the client:
 
-**Single Item by DOI (ID)**
+**Query Single Item by DOI or ID**
 
 Analogous methods exist for all resource components
 
@@ -113,36 +112,115 @@ let member = client.member("member_id")?;
 **Query**
 
 ```rust
-let query = WorksQuery::new().query("Machine Learning");
+let query = WorksQuery::new("Machine Learning");
 
 // one page of the matching results
 let works = client.works(query)?;
 ```
 
-**Convenience method for Work Items by terms**
+Alternatively insert a free form query term directly
 
 ```rust
-let works = client.query_works("Machine Learning")?;
+let works = client.works("Machine Learning")?;
 ```
 
-**Combining Routes with the `Works` route**
+ **Combining Routes with the `Works` route**
 
 For each resource component other than `Works` there exist methods to append a `WorksQuery` with the ID option `/members/{member_id}/works?<query>?`
 
-```rust
-let works = client.member_works("member_id", WorksQuery::new()
-    .query("machine learning")
-    .sort(Sort::Score))?;
+```
+use crossref::*;
+fn run() -> Result<()> {
+    let client = Crossref::builder().build()?;
+    let works = client.member_works(WorksQuery::new("machine learning")
+    .sort(Sort::Score).into_ident("member_id"))?;
+    Ok(())
+}
 ```
 
-Convenience method to append works query term:
+This would be the same as using the [`Crossref::works`] method by supplying the combined type
 
 ```rust
+use crossref::*;
+fn run() -> Result<()> {
+    let client = Crossref::builder().build()?;
+    let works = client.works(WorksQuery::new("machine learning")
+     .sort(Sort::Score)
+     .into_combined_query::<Members>("member_id"))?;
+    Ok(())
+}
+```
 
-let works = client.member_works("member id", "Machine Learning")?;
-``` 
+** Deep paging for `Works` **
+[Deep paging results](https://github.com/CrossRef/rest-api-doc#deep-paging-with-cursors)
+Deep paging is supported for all queries, that return a list of `Work`, `WorkList`.
+This function returns a new iterator over pages of `Work`, which is returned as bulk of items as a `WorkList` by crossref.
+Usually a single page `WorkList` contains 20 items.
 
-**Deep paging for Works**
+Example
+
+Iterate over all `Works` linked to search term `Machine Learning`
+
+```rust
+use crossref::{Crossref, WorksQuery, Work};
+fn run() -> Result<(), crossref::Error> {
+    let client = Crossref::builder().build()?;
+    
+    let all_works: Vec<Work> = client.deep_page(WorksQuery::new("Machine Learning")).flat_map(|x|x.items).collect();
+    
+    Ok(())
+}
+```
+
+Which can be simplified to
+```rust
+use crossref::{Crossref, WorksQuery, Work};
+fn run() -> Result<(), crossref::Error> {
+    let client = Crossref::builder().build()?;
+    
+    let all_works: Vec<Work> = client.deep_page("Machine Learning").into_work_iter().collect();
+    
+    Ok(())
+}
+```
+
+
+Iterate over all the pages (`WorkList`) of the funder with id `funder id` by using a combined query.
+A single `WorkList` usually holds 20 `Work` items.
+
+```rust
+use crossref::{Crossref, Funders, WorksQuery, Work, WorkList};
+fn run() -> Result<(), crossref::Error> {
+    let client = Crossref::builder().build()?;
+    
+    let all_funder_work_list: Vec<WorkList> = client.deep_page(WorksQuery::default()
+            .into_combined_query::<Funders>("funder id")
+      )
+        .collect();
+    
+    Ok(())
+}
+```
+
+Iterate over all `Work` items of a specfic funder directly.
+
+```rust
+use crossref::{Crossref, Funders, WorksQuery, Work, WorkList};
+fn run() -> Result<(), crossref::Error> {
+    let client = Crossref::builder().build()?;
+    
+    let all_works: Vec<Work> = client.deep_page(WorksQuery::default()
+         .into_combined_query::<Funders>("funder id"))
+         .into_work_iter()
+         .collect();
+    
+    Ok(())
+}
+```
+
+
+## Command Line Application
+
 
 
 ## License
