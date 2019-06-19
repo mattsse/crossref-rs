@@ -61,7 +61,7 @@
 //! ```edition2018
 //! # use crossref::*;
 //! # fn run() -> Result<()> {
-//! let query = WorksQuery::new_query("Machine Learning")
+//! let query = WorksQuery::new("Machine Learning")
 //! // field queries supported for `Works`
 //! .field_query(FieldQuery::author("Some Author"))
 //! // filters are specific for each resource component
@@ -124,7 +124,7 @@
 //! # use crossref::*;
 //! # fn run() -> Result<()> {
 //! # let client = Crossref::builder().build()?;
-//! let query = WorksQuery::new_query("Machine Learning");
+//! let query = WorksQuery::new("Machine Learning");
 //!
 //! // one page of the matching results
 //! let works = client.works(query)?;
@@ -132,13 +132,15 @@
 //! # }
 //! ```
 //!
-//! **Convenience method for Work Items by terms**
+//! Alternatively insert a free form query term directly
 //!
 //! ```edition2018
 //! # use crossref::*;
 //! # fn run() -> Result<()> {
 //! # let client = Crossref::builder().build()?;
-//! let works = client.query_works("Machine Learning")?;
+//!
+//! // one page of the matching results
+//! let works = client.works("Machine Learning")?;
 //! # Ok(())
 //! # }
 //! ```
@@ -147,13 +149,25 @@
 //!
 //! For each resource component other than `Works` there exist methods to append a `WorksQuery` with the ID option `/members/{member_id}/works?<query>?`
 //!
-//! ```
+//! ```edition2018
 //! # use crossref::*;
 //! # fn run() -> Result<()> {
 //! # let client = Crossref::builder().build()?;
-//! let works = client.member_works( WorksQuery::new()
-//! .query("machine learning")
+//! let works = client.member_works( WorksQuery::new("machine learning")
 //! .sort(Sort::Score).into_ident("member_id"))?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! This would be the same as using the [`Crossref::works`] method by supplying the combined type
+//!
+//! ```edition2018
+//! # use crossref::*;
+//! # fn run() -> Result<()> {
+//! # let client = Crossref::builder().build()?;
+//! let works = client.works(WorksQuery::new("machine learning")
+//!     .sort(Sort::Score)
+//!     .into_combined_query::<Members>("member_id"))?;
 //! # Ok(())
 //! # }
 //! ```
@@ -161,7 +175,8 @@
 //! ** Deep paging for `Works` **
 //! [Deep paging results](https://github.com/CrossRef/rest-api-doc#deep-paging-with-cursors)
 //! Deep paging is supported for all queries, that return a list of `Work`, `WorkList`.
-//! This function returns a new iterator over all available `Work`.
+//! This function returns a new iterator over pages of `Work`, which is returned as bulk of items as a `WorkList` by crossref.
+//! Usually a single page `WorkList` contains 20 items.
 //!
 //! # Example
 //!
@@ -172,25 +187,59 @@
 //! # fn run() -> Result<(), crossref::Error> {
 //! let client = Crossref::builder().build()?;
 //!
-//! let all_works: Vec<Work> = client.deep_page(WorksQuery::new_query("Machine Learning")).flat_map(|x|x.items).collect();
+//! let all_works: Vec<Work> = client.deep_page(WorksQuery::new("Machine Learning")).flat_map(|x|x.items).collect();
 //!
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! # Example
+//! Which can be simplified to
 //!
-//! Iterate over all `Works` of the funder with id `funder id` by using a combined query
 //! ```edition2018
-//! use crossref::{Crossref, Funders, WorksQuery, Work};
+//! use crossref::{Crossref, WorksQuery, Work};
 //! # fn run() -> Result<(), crossref::Error> {
 //! let client = Crossref::builder().build()?;
 //!
-//! let all_works: Vec<Work> = client.deep_page(WorksQuery::new().into_combined_query::<Funders>("funder id")).flat_map(|x|x.items).collect();
+//! let all_works: Vec<Work> = client.deep_page("Machine Learning").into_work_iter().collect();
 //!
 //! # Ok(())
 //! # }
 //! ```
+//!
+//!
+//! # Example
+//!
+//! Iterate over all the pages (`WorkList`) of the funder with id `funder id` by using a combined query.
+//! A single `WorkList` usually holds 20 `Work` items.
+//!
+//! ```edition2018
+//! use crossref::{Crossref, Funders, WorksQuery, Work, WorkList};
+//! # fn run() -> Result<(), crossref::Error> {
+//! let client = Crossref::builder().build()?;
+//!
+//! let all_funder_work_list: Vec<WorkList> = client.deep_page(WorksQuery::default().into_combined_query::<Funders>("funder id")).collect();
+//!
+//! # Ok(())
+//! # }
+//! ```
+//! # Example
+//!
+//! Iterate over all `Work` items of a specfic funder directly.
+//!
+//! ```edition2018
+//! use crossref::{Crossref, Funders, WorksQuery, Work, WorkList};
+//! # fn run() -> Result<(), crossref::Error> {
+//! let client = Crossref::builder().build()?;
+//!
+//! let all_works: Vec<Work> = client.deep_page(WorksQuery::default()
+//!         .into_combined_query::<Funders>("funder id"))
+//!         .into_work_iter()
+//!         .collect();
+//!
+//! # Ok(())
+//! # }
+//! ```
+
 #![deny(warnings)]
 #![deny(missing_docs)]
 #![allow(unused)]
@@ -231,6 +280,7 @@ use crate::error::ErrorKind;
 use crate::query::{FundersQuery, MembersQuery, ResourceComponent};
 use crate::response::{MessageType, Prefix};
 use reqwest::{self, Client};
+use std::iter::FlatMap;
 
 macro_rules! get_item {
     ($ident:ident, $value:expr, $got:expr) => {
@@ -321,7 +371,7 @@ impl Crossref {
     /// # fn run() -> Result<(), crossref::Error> {
     /// let client = Crossref::builder().build()?;
     ///
-    /// let query = WorksQuery::new_query("Machine Learning")
+    /// let query = WorksQuery::new("Machine Learning")
     ///     .filter(WorksFilter::HasOrcid)
     ///     .order(crossref::Order::Asc)
     ///     .field_query(FieldQuery::author("Some Author"))
@@ -355,7 +405,8 @@ impl Crossref {
 
     /// [Deep paging results](https://github.com/CrossRef/rest-api-doc#deep-paging-with-cursors)
     /// Deep paging is supported for all queries, that return a list of `Work`, `WorkList`.
-    /// This function returns a new iterator over all available `Work`.
+    /// This function returns a new iterator over pages of `Work`, which is returned as bulk of items as a `WorkList` by crossref.
+    /// Usually a single page `WorkList` contains 20 items.
     ///
     /// # Example
     ///
@@ -366,7 +417,7 @@ impl Crossref {
     /// # fn run() -> Result<(), crossref::Error> {
     /// let client = Crossref::builder().build()?;
     ///
-    /// let all_works: Vec<Work> = client.deep_page(WorksQuery::new_query("Machine Learning")).flat_map(|x|x.items).collect();
+    /// let all_works: Vec<Work> = client.deep_page(WorksQuery::new("Machine Learning")).flat_map(|x|x.items).collect();
     ///
     /// # Ok(())
     /// # }
@@ -374,20 +425,40 @@ impl Crossref {
     ///
     /// # Example
     ///
-    /// Iterate over all `Works` of the funder with id `funder id` by using a combined query
+    /// Iterate over all the pages (`WorkList`) of the funder with id `funder id` by using a combined query.
+    /// A single `WorkList` usually holds 20 `Work` items.
+    ///
     /// ```edition2018
-    /// use crossref::{Crossref, Funders, WorksQuery, Work};
+    /// use crossref::{Crossref, Funders, WorksQuery, Work, WorkList};
     /// # fn run() -> Result<(), crossref::Error> {
     /// let client = Crossref::builder().build()?;
     ///
-    /// let all_works: Vec<Work> = client.deep_page(WorksQuery::new().into_combined_query::<Funders>("funder id")).flat_map(|x|x.items).collect();
+    /// let all_funder_work_list: Vec<WorkList> = client.deep_page(WorksQuery::default().into_combined_query::<Funders>("funder id")).collect();
     ///
     /// # Ok(())
     /// # }
     /// ```
     /// # Example
     ///
-    /// Alternatively deep page without an iterator
+    /// Iterate over all `Work` items of a specfic funder directly.
+    ///
+    /// ```edition2018
+    /// use crossref::{Crossref, Funders, WorksQuery, Work, WorkList};
+    /// # fn run() -> Result<(), crossref::Error> {
+    /// let client = Crossref::builder().build()?;
+    ///
+    /// let all_works: Vec<Work> = client.deep_page(WorksQuery::default()
+    ///         .into_combined_query::<Funders>("funder id"))
+    ///         .into_work_iter()
+    ///         .collect();
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Example
+    ///
+    /// Alternatively deep page without an iterator by handling the cursor directly
     ///
     /// ```edition2018
     /// use crossref::{Crossref, WorksQuery, WorksFilter};
@@ -395,7 +466,7 @@ impl Crossref {
     /// let client = Crossref::builder().build()?;
     ///
     /// // request a next-cursor first
-    /// let query = WorksQuery::new_query("Machine Learning")
+    /// let query = WorksQuery::new("Machine Learning")
     ///     .new_cursor();
     ///
     /// let works = client.works(query.clone())?;
@@ -426,36 +497,6 @@ impl Crossref {
     pub fn work_agency(&self, doi: &str) -> Result<WorkAgency> {
         let resp = self.get_response(&Works::Agency(doi.to_string()))?;
         get_item!(WorkAgency, resp.message, resp.message_type)
-    }
-
-    /// Convenience method to execute [Crossref::works] with a query only consisting of terms.
-    ///
-    /// # Example
-    ///
-    /// ```edition2018
-    /// # fn run() -> Result<(), crossref::Error> {
-    /// let client = crossref::Crossref::builder().build()?;
-    ///
-    /// let works = client.query_works("Machine Learning")?;
-    ///
-    /// # Ok(())
-    /// # }
-    /// ```
-    /// This would be the same as
-    ///
-    /// ```edition2018
-    /// use crossref::{Crossref, WorksQuery, WorksFilter};
-    /// # fn run() -> Result<(), crossref::Error> {
-    /// let client = Crossref::builder().build()?;
-    ///
-    /// let works = client.works(WorksQuery::new()
-    ///        .query("Machine Learning"))?;
-    ///
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn query_works(&self, term: &str) -> Result<WorkList> {
-        self.works(WorksQuery::new().query(term))
     }
 
     /// Return the matching `Funders` items.
@@ -625,6 +666,12 @@ pub struct WorkListIterator<'a> {
     index: usize,
     /// whether the iterator should finish next iteration
     finish_next_iteration: bool,
+}
+impl<'a> WorkListIterator<'a> {
+    /// convenience method to create a `WorkIterator`
+    pub fn into_work_iter(self) -> impl Iterator<Item = Work> + 'a {
+        self.flat_map(|x| x.items)
+    }
 }
 
 impl<'a> Iterator for WorkListIterator<'a> {

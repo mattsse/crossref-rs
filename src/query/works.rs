@@ -530,6 +530,12 @@ impl Into<WorkListQuery> for WorksQuery {
     }
 }
 
+impl<T: ToString> From<T> for WorkListQuery {
+    fn from(term: T) -> Self {
+        WorkListQuery::Works(WorksQuery::new(term))
+    }
+}
+
 impl CrossrefRoute for WorkListQuery {
     fn route(&self) -> Result<String> {
         match self {
@@ -573,7 +579,7 @@ impl CrossrefQuery for WorkListQuery {
 /// ```edition2018
 /// use crossref::{WorksIdentQuery, WorksQuery};
 ///
-/// let combined = WorksIdentQuery::new("100000015", WorksQuery::new().query("ontologies"));
+/// let combined = WorksIdentQuery::new("100000015", WorksQuery::new("ontologies"));
 ///
 /// ```
 /// Is equal to create a `WorksIdentQuery` from a `WorksQuery`
@@ -581,7 +587,7 @@ impl CrossrefQuery for WorkListQuery {
 /// ```edition2018
 /// use crossref::WorksQuery;
 ///
-/// let combined = WorksQuery::new().query("ontologies").into_ident("100000015");
+/// let combined = WorksQuery::new("ontologies").into_ident("100000015");
 ///
 /// ```
 /// helper struct to capture an id for a `Component` other than `/works` and an additional query for the `/works` route
@@ -660,14 +666,9 @@ impl WorksQuery {
         WorksQuery::default().sample(len)
     }
 
-    /// alias for creating an new default element
-    pub fn new() -> Self {
-        WorksQuery::default()
-    }
-
     /// Convenience method to create a new `WorksQuery` with a term directly
-    pub fn new_query<T: ToString>(query: T) -> Self {
-        WorksQuery::new().query(query)
+    pub fn new<T: ToString>(query: T) -> Self {
+        WorksQuery::empty().query(query)
     }
 
     /// add a new free form query
@@ -689,7 +690,7 @@ impl WorksQuery {
     /// ```edition2018
     /// use crossref::WorksQuery;
     ///
-    /// let query = WorksQuery::new().queries(&["renear", "ontologies"]);
+    /// let query = WorksQuery::default().queries(&["renear", "ontologies"]);
     /// ```
     /// add a bunch of free form query terms
     pub fn queries<T: ToString>(mut self, queries: &[T]) -> Self {
@@ -707,7 +708,7 @@ impl WorksQuery {
     /// ```edition2018
     /// use crossref::{FieldQuery,WorksQuery};
     ///
-    /// let query = WorksQuery::new().field_queries(vec![FieldQuery::title("room at the bottom"), FieldQuery::author("richard feynman")]);
+    /// let query = WorksQuery::default().field_queries(vec![FieldQuery::title("room at the bottom"), FieldQuery::author("richard feynman")]);
     /// ```
     /// add a bunch of free form query terms
     pub fn field_queries(mut self, queries: Vec<FieldQuery>) -> Self {
@@ -770,7 +771,7 @@ impl WorksQuery {
     ///
     /// ```edition2018
     /// # use crossref::{WorksQuery, Funders};
-    /// let funders: Funders = WorksQuery::new().into_combined("funder id");
+    /// let funders: Funders = WorksQuery::default().into_combined("funder id");
     /// ```
     pub fn into_combined<W: WorksCombiner>(self, id: &str) -> W {
         W::ident_query(self.into_ident(id))
@@ -790,7 +791,7 @@ impl WorksQuery {
     ///
     /// ```edition2018
     /// # use crossref::{WorksQuery, Funders};
-    /// let query = WorksQuery::new()
+    /// let query = WorksQuery::default()
     ///     .into_combined_query::<Funders>("funder id");
     ///
     /// ```
@@ -807,7 +808,7 @@ impl WorksQuery {
 /// use crossref::{Order, WorksQuery};
 ///
 /// // create a new query for topcis machine+learning ordered desc
-/// let query = WorksQuery::new().query("machine learning").order(Order::Desc);
+/// let query = WorksQuery::new("machine learning").order(Order::Desc);
 /// ```
 ///
 /// Each query parameter is ANDed
