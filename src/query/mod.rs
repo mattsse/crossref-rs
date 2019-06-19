@@ -12,6 +12,9 @@ use core::fmt::Debug;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::fmt;
+use std::str::FromStr;
+#[cfg(feature = "cli")]
+use structopt::StructOpt;
 
 /// Helper trait for unified interface
 pub trait CrossrefParams {
@@ -199,10 +202,19 @@ impl Visibility {
 
 /// Determines how results should be sorted
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "cli", derive(StructOpt))]
 pub enum Order {
     /// list results in ascending order
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "asc", about = "list results in ascending order")
+    )]
     Asc,
     /// list results in descending order
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "desc", about = "list results in descending order")
+    )]
     Desc,
 }
 
@@ -212,6 +224,19 @@ impl Order {
         match self {
             Order::Asc => "asc",
             Order::Desc => "desc",
+        }
+    }
+}
+
+#[cfg(feature = "cli")]
+impl FromStr for Order {
+    type Err = String;
+
+    fn from_str(s: &str) -> ::std::result::Result<Self, Self::Err> {
+        match s {
+            "asc" => Ok(Order::Asc),
+            "desc" => Ok(Order::Desc),
+            other => Err(format!("Unable to convert {} to Order", other)),
         }
     }
 }
@@ -228,26 +253,79 @@ impl CrossrefQueryParam for Order {
 
 /// Results from a list response can be sorted by applying the sort and order parameters.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(StructOpt))]
 pub enum Sort {
     /// Sort by relevance score
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "score", about = "Sort by the relevance score")
+    )]
     Score,
     /// Sort by date of most recent change to metadata. Currently the same as `Deposited`
+    #[cfg_attr(
+        feature = "cli",
+        structopt(
+            name = "updated",
+            about = "Sort by date of most recent change to metadata."
+        )
+    )]
     Updated,
     /// Sort by time of most recent deposit
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "deposited", about = "Sort by time of most recent deposit")
+    )]
     Deposited,
     /// Sort by time of most recent index
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "indexed", about = "Sort by time of most recent index")
+    )]
     Indexed,
     /// Sort by publication date
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "published", about = "Sort by publication date")
+    )]
     Published,
     /// Sort by print publication date
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "published-print", about = "Sort by print publication date")
+    )]
     PublishedPrint,
     /// Sort by online publication date
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "published-online", about = "Sort by online publication date")
+    )]
     PublishedOnline,
     /// Sort by issued date (earliest known publication date)
+    #[cfg_attr(
+        feature = "cli",
+        structopt(
+            name = "issued",
+            about = "Sort by issued date (earliest known publication date)"
+        )
+    )]
     Issued,
     /// Sort by number of times this DOI is referenced by other Crossref DOIs
+    #[cfg_attr(
+        feature = "cli",
+        structopt(
+            name = "is-referenced-by-count",
+            about = "Sort by number of times this DOI is referenced by other Crossref DOIs"
+        )
+    )]
     IsReferencedByCount,
     /// Sort by number of references included in the references section of the document identified by this DOI
+    #[cfg_attr(
+        feature = "cli",
+        structopt(
+            name = "reference-count",
+            about = "Sort by number of references included in the references section of the document identified by this DOI"
+        )
+    )]
     ReferenceCount,
 }
 
@@ -265,6 +343,27 @@ impl Sort {
             Sort::Issued => "issued",
             Sort::IsReferencedByCount => "is-reference-by-count",
             Sort::ReferenceCount => "reference-count",
+        }
+    }
+}
+
+#[cfg(feature = "cli")]
+impl FromStr for Sort {
+    type Err = String;
+
+    fn from_str(s: &str) -> ::std::result::Result<Self, Self::Err> {
+        match s {
+            "score" => Ok(Sort::Score),
+            "updated" => Ok(Sort::Updated),
+            "deposited" => Ok(Sort::Deposited),
+            "indexed" => Ok(Sort::Indexed),
+            "published" => Ok(Sort::Published),
+            "published-print" => Ok(Sort::PublishedPrint),
+            "published-online" => Ok(Sort::PublishedOnline),
+            "issued" => Ok(Sort::Issued),
+            "is-reference-by-count" => Ok(Sort::IsReferencedByCount),
+            "reference-count" => Ok(Sort::ReferenceCount),
+            other => Err(format!("Unable to convert {} to Sort", other)),
         }
     }
 }

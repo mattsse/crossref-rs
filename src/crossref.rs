@@ -1,6 +1,7 @@
-use crossref::{Crossref, WorksQuery};
+use crossref::{query::ResourceComponent, Crossref, Order, Sort, WorksQuery};
 use std::path::PathBuf;
 use structopt::StructOpt;
+
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "crossref",
@@ -10,7 +11,11 @@ use structopt::StructOpt;
 enum App {
     #[structopt(name = "works", about = "Query crossref works")]
     Works {
-        #[structopt(short = "d", long = "deep-page", help = "deep-page the request")]
+        #[structopt(
+            short = "d",
+            long = "deep-page",
+            help = "Enable deep paging. If a limit is set, then the limit takes priority."
+        )]
         deep_page: bool,
         #[structopt(flatten)]
         opts: Opts,
@@ -54,6 +59,13 @@ impl App {
             | App::Prefixes { opts, .. }
             | App::Types { opts, .. } => opts,
         }
+    }
+
+    pub fn get_value(&self, client: &Crossref) -> crossref::Result<serde_json::Value> {
+
+
+
+        unimplemented!()
     }
 }
 
@@ -120,6 +132,30 @@ struct Opts {
 
     #[structopt(short = "l", long = "limit", help = "limit the amount of results")]
     limit: Option<usize>,
+
+    #[structopt(long = "id", help = "The id of component.")]
+    id: Option<String>,
+
+    #[structopt(
+        short = "q",
+        long = "queries",
+        help = "The free form terms for the query"
+    )]
+    free_form_queries: Vec<String>,
+
+    sort: Option<Sort>,
+
+    order: Option<Order>,
+    #[structopt(
+        long = "sample",
+        help = "Request randoms Elements. Overrides all other options."
+    )]
+    sample: Option<usize>,
+    #[structopt(
+        long = "offset",
+        help = "Sets an offset where crossref begins to retrieve items."
+    )]
+    offset: Option<usize>,
 
     #[structopt(flatten)]
     client_opts: ClientOpts,

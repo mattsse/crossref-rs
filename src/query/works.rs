@@ -7,6 +7,8 @@ use serde::Serialize;
 use serde::Serializer as SerdeSerializer;
 use serde_json::Value;
 use std::borrow::Cow;
+#[cfg(feature = "cli")]
+use structopt::StructOpt;
 
 /// Filters allow you to narrow queries. All filter results are lists
 #[derive(Debug, Clone)]
@@ -292,6 +294,7 @@ impl Filter for WorksFilter {}
 
 /// Field queries are available on the `/works` route and allow for queries that match only particular fields of metadata.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(StructOpt))]
 pub struct FieldQuery {
     /// match any only particular fields of metadata.
     pub name: String,
