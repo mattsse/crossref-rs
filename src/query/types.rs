@@ -1,6 +1,7 @@
 use crate::error::{Error, ErrorKind, Result};
 use crate::query::works::{WorksCombiner, WorksFilter, WorksIdentQuery, WorksQuery};
 use crate::query::{Component, CrossrefQuery, CrossrefRoute, ResourceComponent};
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// all possible types of a `Work`

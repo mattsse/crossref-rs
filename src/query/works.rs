@@ -3,8 +3,8 @@ use crate::query::facet::FacetCount;
 use crate::query::types::Type;
 use crate::query::*;
 use chrono::NaiveDate;
-use serde::Serialize;
 use serde::Serializer as SerdeSerializer;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
 #[cfg(feature = "cli")]

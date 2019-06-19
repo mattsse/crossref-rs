@@ -2,8 +2,8 @@ use crate::query::facet::Facet;
 use crate::query::facet::FacetCount;
 use crate::query::Visibility;
 use crate::response::work::*;
-use serde::de::{self, Deserialize, Deserializer};
-
+use serde::de::Deserializer;
+use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Value};
 use std::collections::HashMap;
 use std::fmt;
@@ -106,13 +106,15 @@ impl<'de> Deserialize<'de> for Response {
 
         macro_rules! msg_arm {
             ($ident:ident, $value:expr) => {{
-                Message::$ident(::serde_json::from_value($value).map_err(de::Error::custom)?)
+                Message::$ident(
+                    ::serde_json::from_value($value).map_err(::serde::de::Error::custom)?,
+                )
             }};
             ($ident:ident, $value:expr, $ty:ty) => {{
                 let list_resp: ListResp =
-                    ::serde_json::from_value($value).map_err(de::Error::custom)?;
-                let items: Vec<$ty> =
-                    ::serde_json::from_value(list_resp.items).map_err(de::Error::custom)?;
+                    ::serde_json::from_value($value).map_err(::serde::de::Error::custom)?;
+                let items: Vec<$ty> = ::serde_json::from_value(list_resp.items)
+                    .map_err(::serde::de::Error::custom)?;
                 Message::$ident($ident {
                     facets: list_resp.facets,
                     total_results: list_resp.total_results,
@@ -145,7 +147,7 @@ impl<'de> Deserialize<'de> for Response {
                 MessageType::Type => msg_arm!(Type, msg),
                 MessageType::TypeList => msg_arm!(TypeList, msg, CrossrefType),
                 MessageType::Work => msg_arm!(Work, msg),
-                MessageType::WorkList => work_list(msg).map_err(de::Error::custom)?,
+                MessageType::WorkList => work_list(msg).map_err(::serde::de::Error::custom)?,
                 MessageType::Member => msg_arm!(Member, msg),
                 MessageType::MemberList => msg_arm!(MemberList, msg, Member),
                 MessageType::Journal => msg_arm!(Journal, msg),

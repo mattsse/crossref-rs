@@ -4,6 +4,7 @@ use crate::error::Result;
 use crate::response::{FacetMap, QueryResponse};
 use crate::{Crossref, WorkListQuery, WorksQuery};
 use chrono::NaiveDate;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// A hashmap containing relation name, `Relation` pairs.

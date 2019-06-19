@@ -9,7 +9,7 @@ use crate::query::works::{Works, WorksFilter};
 pub use crate::query::works::{WorksIdentQuery, WorksQuery};
 use chrono::NaiveDate;
 use core::fmt::Debug;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt;
 use std::str::FromStr;

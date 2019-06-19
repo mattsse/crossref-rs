@@ -243,8 +243,6 @@
 #![deny(warnings)]
 #![deny(missing_docs)]
 #![allow(unused)]
-#[macro_use]
-extern crate serde_derive;
 
 mod error;
 /// provides types to construct a specific query

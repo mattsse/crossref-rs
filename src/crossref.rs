@@ -62,9 +62,6 @@ impl App {
     }
 
     pub fn get_value(&self, client: &Crossref) -> crossref::Result<serde_json::Value> {
-
-
-
         unimplemented!()
     }
 }
