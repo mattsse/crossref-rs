@@ -149,7 +149,7 @@ impl FromStr for Type {
 }
 
 /// constructs the request payload for the `/types` route
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum Types {
     /// every available type
     All,

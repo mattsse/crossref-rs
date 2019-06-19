@@ -34,7 +34,7 @@ pub trait CrossrefParams {
 macro_rules! impl_common_query {
     ($i:ident, $filter:ident) => {
         /// Each query parameter is ANDed
-        #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Default)]
         pub struct $i {
             /// search by non specific query
             pub queries: Vec<String>,
@@ -198,7 +198,7 @@ impl Visibility {
 }
 
 /// Determines how results should be sorted
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Order {
     /// list results in ascending order
     Asc,
@@ -227,7 +227,7 @@ impl CrossrefQueryParam for Order {
 }
 
 /// Results from a list response can be sorted by applying the sort and order parameters.
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
 pub enum Sort {
     /// Sort by relevance score
     Score,
@@ -280,7 +280,7 @@ impl CrossrefQueryParam for Sort {
 }
 
 /// tells crossref how many items shall be returned or where to start
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum ResultControl {
     /// limits the returned items per page
     Rows(usize),
@@ -359,7 +359,7 @@ impl CrossrefRoute for Component {
 }
 
 /// bundles all available crossref api endpoints
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum ResourceComponent {
     /// returns a list of all works (journal articles, conference proceedings, books, components, etc), 20 per page
     Works(Works),

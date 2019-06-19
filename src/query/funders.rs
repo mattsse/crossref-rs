@@ -5,7 +5,7 @@ use crate::query::*;
 use std::borrow::Cow;
 
 /// filters supported for the /funders route
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum FundersFilter {
     /// funders located in specified country
     Location(String),
@@ -37,7 +37,7 @@ impl Filter for FundersFilter {}
 impl_common_query!(FundersQuery, FundersFilter);
 
 /// constructs the request payload for the `/funders` route
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum Funders {
     /// target a specific funder at `/funder/{id}`
     Identifier(String),

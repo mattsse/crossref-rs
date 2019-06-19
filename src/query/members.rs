@@ -4,8 +4,7 @@ use crate::query::*;
 use std::borrow::Cow;
 
 /// filters supported for the `/members` route
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone)]
 pub enum MembersFilter {
     /// Member has made their references public for one or more of their prefixes
     HasPublicReferences,
@@ -49,7 +48,7 @@ impl Filter for MembersFilter {}
 impl_common_query!(MembersQuery, MembersFilter);
 
 /// constructs the request payload for the `/members` route
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum Members {
     /// target a specific member at `/members/{id}`
     Identifier(String),

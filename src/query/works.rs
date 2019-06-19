@@ -9,8 +9,7 @@ use serde_json::Value;
 use std::borrow::Cow;
 
 /// Filters allow you to narrow queries. All filter results are lists
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone)]
 pub enum WorksFilter {
     /// metadata which includes one or more funder entry
     HasFunder,
@@ -292,7 +291,7 @@ impl ParamFragment for WorksFilter {
 impl Filter for WorksFilter {}
 
 /// Field queries are available on the `/works` route and allow for queries that match only particular fields of metadata.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct FieldQuery {
     /// match any only particular fields of metadata.
     pub name: String,
@@ -378,7 +377,7 @@ impl CrossrefQueryParam for FieldQuery {
 }
 
 /// limits from where and how many `Work` items should be returned
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum WorkResultControl {
     /// use the standard ResultControl available for all components
     Standard(ResultControl),
@@ -456,7 +455,7 @@ impl CrossrefQueryParam for WorkResultControl {
 ///
 /// let works = Works::agency_for_doi("10.1037/0003-066X.59.1.29");
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum Works {
     /// target a Work by a specific id
     Identifier(String),
@@ -591,7 +590,7 @@ impl CrossrefQuery for WorkListQuery {
 ///
 /// ```
 /// helper struct to capture an id for a `Component` other than `/works` and an additional query for the `/works` route
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct WorksIdentQuery {
     /// the id of an component item
     pub id: String,
@@ -812,7 +811,7 @@ impl WorksQuery {
 /// ```
 ///
 /// Each query parameter is ANDed
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default)]
 pub struct WorksQuery {
     /// search by non specific query
     pub free_form_queries: Vec<String>,
