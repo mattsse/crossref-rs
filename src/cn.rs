@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone, Serialize)]
 #[allow(missing_docs)]
 pub enum CnFormat {

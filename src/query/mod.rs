@@ -9,9 +9,12 @@ use crate::query::works::{Works, WorksFilter};
 pub use crate::query::works::{WorksIdentQuery, WorksQuery};
 use chrono::NaiveDate;
 use core::fmt::Debug;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt;
+use std::str::FromStr;
+#[cfg(feature = "cli")]
+use structopt::StructOpt;
 
 /// Helper trait for unified interface
 pub trait CrossrefParams {
@@ -34,7 +37,7 @@ pub trait CrossrefParams {
 macro_rules! impl_common_query {
     ($i:ident, $filter:ident) => {
         /// Each query parameter is ANDed
-        #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Default)]
         pub struct $i {
             /// search by non specific query
             pub queries: Vec<String>,
@@ -56,16 +59,17 @@ macro_rules! impl_common_query {
                 $i::default()
             }
 
-            /// alias for creating an new default element
-            pub fn new() -> Self {
-                $i::default()
+            /// Convenience method to create a new query with a term directly
+            pub fn new<T: ToString>(query: T) -> Self {
+                Self::empty().query(query)
             }
 
             /// add a new free form query
-            pub fn query(mut self, query: &str) -> Self {
+            pub fn query<T: ToString>(mut self, query: T) -> Self {
                 self.queries.push(query.to_string());
                 self
             }
+
             /// add a new filter to the query
             pub fn filter(mut self, filter: $filter) -> Self {
                 self.filter.push(filter);
@@ -198,11 +202,20 @@ impl Visibility {
 }
 
 /// Determines how results should be sorted
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "cli", derive(StructOpt))]
 pub enum Order {
     /// list results in ascending order
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "asc", about = "list results in ascending order")
+    )]
     Asc,
     /// list results in descending order
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "desc", about = "list results in descending order")
+    )]
     Desc,
 }
 
@@ -212,6 +225,19 @@ impl Order {
         match self {
             Order::Asc => "asc",
             Order::Desc => "desc",
+        }
+    }
+}
+
+#[cfg(feature = "cli")]
+impl FromStr for Order {
+    type Err = String;
+
+    fn from_str(s: &str) -> ::std::result::Result<Self, Self::Err> {
+        match s {
+            "asc" => Ok(Order::Asc),
+            "desc" => Ok(Order::Desc),
+            other => Err(format!("Unable to convert {} to Order", other)),
         }
     }
 }
@@ -227,27 +253,80 @@ impl CrossrefQueryParam for Order {
 }
 
 /// Results from a list response can be sorted by applying the sort and order parameters.
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(StructOpt))]
 pub enum Sort {
     /// Sort by relevance score
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "score", about = "Sort by the relevance score")
+    )]
     Score,
     /// Sort by date of most recent change to metadata. Currently the same as `Deposited`
+    #[cfg_attr(
+        feature = "cli",
+        structopt(
+            name = "updated",
+            about = "Sort by date of most recent change to metadata."
+        )
+    )]
     Updated,
     /// Sort by time of most recent deposit
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "deposited", about = "Sort by time of most recent deposit")
+    )]
     Deposited,
     /// Sort by time of most recent index
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "indexed", about = "Sort by time of most recent index")
+    )]
     Indexed,
     /// Sort by publication date
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "published", about = "Sort by publication date")
+    )]
     Published,
     /// Sort by print publication date
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "published-print", about = "Sort by print publication date")
+    )]
     PublishedPrint,
     /// Sort by online publication date
+    #[cfg_attr(
+        feature = "cli",
+        structopt(name = "published-online", about = "Sort by online publication date")
+    )]
     PublishedOnline,
     /// Sort by issued date (earliest known publication date)
+    #[cfg_attr(
+        feature = "cli",
+        structopt(
+            name = "issued",
+            about = "Sort by issued date (earliest known publication date)"
+        )
+    )]
     Issued,
     /// Sort by number of times this DOI is referenced by other Crossref DOIs
+    #[cfg_attr(
+        feature = "cli",
+        structopt(
+            name = "is-referenced-by-count",
+            about = "Sort by number of times this DOI is referenced by other Crossref DOIs"
+        )
+    )]
     IsReferencedByCount,
     /// Sort by number of references included in the references section of the document identified by this DOI
+    #[cfg_attr(
+        feature = "cli",
+        structopt(
+            name = "reference-count",
+            about = "Sort by number of references included in the references section of the document identified by this DOI"
+        )
+    )]
     ReferenceCount,
 }
 
@@ -269,6 +348,27 @@ impl Sort {
     }
 }
 
+#[cfg(feature = "cli")]
+impl FromStr for Sort {
+    type Err = String;
+
+    fn from_str(s: &str) -> ::std::result::Result<Self, Self::Err> {
+        match s {
+            "score" => Ok(Sort::Score),
+            "updated" => Ok(Sort::Updated),
+            "deposited" => Ok(Sort::Deposited),
+            "indexed" => Ok(Sort::Indexed),
+            "published" => Ok(Sort::Published),
+            "published-print" => Ok(Sort::PublishedPrint),
+            "published-online" => Ok(Sort::PublishedOnline),
+            "issued" => Ok(Sort::Issued),
+            "is-reference-by-count" => Ok(Sort::IsReferencedByCount),
+            "reference-count" => Ok(Sort::ReferenceCount),
+            other => Err(format!("Unable to convert {} to Sort", other)),
+        }
+    }
+}
+
 impl CrossrefQueryParam for Sort {
     fn param_key(&self) -> Cow<str> {
         Cow::Borrowed("sort")
@@ -280,7 +380,7 @@ impl CrossrefQueryParam for Sort {
 }
 
 /// tells crossref how many items shall be returned or where to start
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum ResultControl {
     /// limits the returned items per page
     Rows(usize),
@@ -359,7 +459,7 @@ impl CrossrefRoute for Component {
 }
 
 /// bundles all available crossref api endpoints
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum ResourceComponent {
     /// returns a list of all works (journal articles, conference proceedings, books, components, etc), 20 per page
     Works(Works),

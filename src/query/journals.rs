@@ -3,7 +3,7 @@ use crate::query::works::{WorksCombiner, WorksFilter, WorksIdentQuery, WorksQuer
 use crate::query::{Component, CrossrefQuery, CrossrefRoute, ResourceComponent};
 
 /// constructs the request payload for the `/journals` route
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum Journals {
     /// target a specific journal at `/journals/{id}`
     Identifier(String),
