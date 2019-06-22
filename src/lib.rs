@@ -526,6 +526,11 @@ impl Crossref {
         let resp = self.get_response(&Prefixes::Identifier(id.to_string()))?;
         get_item!(Prefix, resp.message, resp.message_type)
     }
+    /// Return a specific `Journal`
+    pub fn journal(&self, id: &str) -> Result<Journal> {
+        let resp = self.get_response(&Journals::Identifier(id.to_string()))?;
+        get_item!(Journal, resp.message, resp.message_type).map(|x| *x)
+    }
 
     /// Return all available `Type`
     pub fn types(&self) -> Result<TypeList> {
@@ -534,8 +539,8 @@ impl Crossref {
     }
 
     /// Return the `Type` for the `id`
-    pub fn type_(&self, id: &str) -> Result<CrossrefType> {
-        let resp = self.get_response(&Types::Identifier(id.to_string()))?;
+    pub fn type_(&self, id: &Type) -> Result<CrossrefType> {
+        let resp = self.get_response(&Types::Identifier(id.id().to_string()))?;
         get_item!(Type, resp.message, resp.message_type)
     }
 

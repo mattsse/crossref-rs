@@ -59,16 +59,17 @@ macro_rules! impl_common_query {
                 $i::default()
             }
 
-            /// alias for creating an new default element
-            pub fn new() -> Self {
-                $i::default()
+            /// Convenience method to create a new query with a term directly
+            pub fn new<T: ToString>(query: T) -> Self {
+                Self::empty().query(query)
             }
 
             /// add a new free form query
-            pub fn query(mut self, query: &str) -> Self {
+            pub fn query<T: ToString>(mut self, query: T) -> Self {
                 self.queries.push(query.to_string());
                 self
             }
+
             /// add a new filter to the query
             pub fn filter(mut self, filter: $filter) -> Self {
                 self.filter.push(filter);
