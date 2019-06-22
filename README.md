@@ -72,7 +72,7 @@ let query = WorksQuery::new("Machine Learning")
 
 See [this table](https://github.com/CrossRef/rest-api-doc#resource-components) for a detailed overview of the major components.
 
-There are 3 available targets:
+There are 3 different targets:
 
 * **standalone resource components**: `/works`, `/members`, `funders`, `prefixes`, `types` that return a list list of the corresponding items and can be specified with queries
 * **Resource component with identifiers**: `/works/{doi}?<query>`,`/members/{member_id}?<query>`, etc. that returns a single item if found.
@@ -221,7 +221,99 @@ fn run() -> Result<(), crossref::Error> {
 
 ## Command Line Application
 
+### Installation
+```shell
+cargo install crossref --features cli
+```
 
+### Usage
+
+Top level subcommands
+```text
+USAGE:
+    crossref <SUBCOMMAND>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+SUBCOMMANDS:
+    funders     Query crossref funders
+    help        Prints this message or the help of the given subcommand(s)
+    journals    Query crossref journals
+    members     Query crossref members
+    prefixes    Query crossref prefixes
+    types       Query crossref types
+    works       Query crossref works
+
+```
+
+Additional options for the component subcommands (querying, sorting, ordering and limiting is only supported for subcommands <works|funders|members> and is overridden by a present `--id` options)
+
+```text
+USAGE:
+    crossref works [FLAGS] [OPTIONS] [SUBCOMMAND]
+
+FLAGS:
+    -a, --append       if the output file already exists, append instead of overwriting the file
+    -d, --deep-page    Enable deep paging. If a limit is set, then the limit takes priority.
+    -h, --help         Prints help information
+    -s, --silent       do not print anything
+    -V, --version      Prints version information
+
+OPTIONS:
+    -i, --id <id>                    The id of component.
+    -l, --limit <limit>              limit the amount of results
+        --offset <offset>            Sets an offset where crossref begins to retrieve items.
+        --order <order>              How to order the results: asc or desc
+    -o <output>                      output path where the results shall be stored
+        --polite <polite>            The email to use to get into crossref's polite pool
+    -q, --query <query_terms>...     The free form terms for the query
+        --sample <sample>            Request randoms Elements. Overrides all other options.
+        --sort <sort>                How to sort the results, such as updated, indexed, published, issued
+        --token <token>              The token to use for the crossref client
+        --user-agent <user_agent>    The user agent to use for the crossref client
+```
+
+### Examples
+
+Retrieve a specific work by a doi
+
+```shell
+ crossref works --id "10.1037/0003-066X.59.1.29"
+```
+
+Save the results as json
+
+```shell
+ crossref works --id "10.1037/0003-066X.59.1.29" -o output.json
+```
+
+Retrieve any other components by their ids
+
+```shell
+ crossref <works|journals|members|prefixes|types> --id "10.1037/0003-066X.59.1.29" -o output.json
+```
+
+Some components support additional filtering
+
+```
+crossref <works|funders|members> --query "A search term such as `Machine learning` for works" --limit 10 --offset 200 --order asc
+```
+
+Get `Works` of a specific component, such as a member with the id `98`:
+
+```
+crossref works member 98
+```
+
+`<prefix|funder|prefix|type` are also supported in the same way.
+
+
+By default deep paging is disabled, hence the max amount of results of `Works` will be 20 (a single crossref page).
+By enabling the `--deep-page` flag, all available results will be gathered.
+
+To get in to the polite pool supply your email to the request headers with `--polite "polite@example.com"`
 
 ## License
 
