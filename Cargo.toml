@@ -1,6 +1,6 @@
 [package]
 name = "crossref"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["matthiasseitz <matthias.seitz@tum.de>"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
