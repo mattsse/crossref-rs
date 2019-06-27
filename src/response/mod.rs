@@ -102,7 +102,7 @@ impl<'de> Deserialize<'de> for Response {
             items: Value,
         }
 
-        let fragment = ResponseFragment::deserialize(deserializer).unwrap();
+        let fragment = ResponseFragment::deserialize(deserializer)?;
 
         macro_rules! msg_arm {
             ($ident:ident, $value:expr) => {{
