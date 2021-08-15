@@ -5,7 +5,7 @@ Crossref-rs - A rust client for the Crossref-API
 [![Documentation](https://docs.rs/crossref/badge.svg)](https://docs.rs/crossref)
 
 
-[Crossref API docs](https://github.com/CrossRef/rest-api-doc>)
+[Crossref API docs](https://github.com/CrossRef/rest-api-doc)
 
 This client is inspired by [sckott/habanero](https://github.com/sckott/habanero/).
 
