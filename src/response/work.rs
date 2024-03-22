@@ -594,5 +594,4 @@ mod tests {
 
         let work: Work = from_str(work_str).unwrap();
     }
-
 }

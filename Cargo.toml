@@ -6,10 +6,10 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 keywords = ["api", "web", "literature", "doi"]
 repository = "https://github.com/MattsSe/crossref-rs"
-description= "Implementation of the Crossref API"
+description = "Implementation of the Crossref API"
 documentation = "https://docs.rs/crossref/"
 categories = ["api-bindings", "science"]
-edition = "2018"
+edition = "2021"
 
 [badges]
 travis-ci = { repository = "MattsSe/crossref-rs", branch = "master" }
@@ -17,17 +17,18 @@ travis-ci = { repository = "MattsSe/crossref-rs", branch = "master" }
 [[bin]]
 name = "crossref"
 path = "src/crossref.rs"
-required-features =["cli"]
+required-features = ["cli"]
 
 [dependencies]
-reqwest = "0.9"
+reqwest = { version = "0.12", features = ["blocking"] }
 serde = { version = "1.0", features = ["derive"] }
 failure = "0.1.8"
 serde_json = "1.0"
-chrono =  { version = "0.4", features = ["serde"] }
-structopt =  { version = "0.3", optional = true }
+chrono = { version = "0.4", features = ["serde"] }
+structopt = { version = "0.3", optional = true }
 url = "2.5"
 pretty_env_logger = { version = "0.5", optional = true }
+tokio = "1"
 
 [features]
 cli = ["structopt", "pretty_env_logger"]
