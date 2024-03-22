@@ -157,9 +157,9 @@ impl DateParts {
         fn naive(v: &[Option<u32>]) -> Option<NaiveDate> {
             match v.len() {
                 0 => None,
-                1 => Some(NaiveDate::from_ymd(v[0]? as i32, 0, 0)),
-                2 => Some(NaiveDate::from_ymd(v[0]? as i32, v[1]?, 0)),
-                3 => Some(NaiveDate::from_ymd(v[0]? as i32, v[1]?, v[2]?)),
+                1 => Some(NaiveDate::from_ymd_opt(v[0]? as i32, 0, 0)?),
+                2 => Some(NaiveDate::from_ymd_opt(v[0]? as i32, v[1]?, 0)?),
+                3 => Some(NaiveDate::from_ymd_opt(v[0]? as i32, v[1]?, v[2]?)?),
                 _ => None,
             }
         }
@@ -594,5 +594,4 @@ mod tests {
 
         let work: Work = from_str(work_str).unwrap();
     }
-
 }

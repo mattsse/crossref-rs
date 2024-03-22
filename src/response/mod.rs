@@ -499,8 +499,7 @@ mod tests {
 
     #[test]
     fn agency_msg_deserialize() {
-        let agency_str =
-            r#"{"status":"ok","message-type":"work-agency","message-version":"1.0.0","message":{"DOI":"10.1037\/0003-066x.59.1.29","agency":{"id":"crossref","label":"Crossref"}}}"#;
+        let agency_str = r#"{"status":"ok","message-type":"work-agency","message-version":"1.0.0","message":{"DOI":"10.1037\/0003-066x.59.1.29","agency":{"id":"crossref","label":"Crossref"}}}"#;
 
         let agency: Response = from_str(agency_str).unwrap();
 
